@@ -470,19 +470,26 @@ def registrar_evento_ignicao(request, pk):
     dia_nome = dias_pt[dia_semana_num]
     hora_fmt = now.strftime('%H:%M')
     eh_fim_semana = dia_semana_num >= 5
+    eh_fora_horario = eh_fim_semana or not (8 <= now.hour < 18)
 
-    if eh_fim_semana:
+    if eh_fora_horario:
         tipo = 'nao_autorizado'
+        if eh_fim_semana:
+            motivo = 'final de semana'
+        elif now.hour < 8:
+            motivo = f'antes do horário permitido ({hora_fmt})'
+        else:
+            motivo = f'após o horário permitido ({hora_fmt})'
         mensagem = (
-            f'Veículo ligado em {dia_nome} às {hora_fmt}. '
-            f'O uso do veículo NÃO é autorizado em finais de semana. '
+            f'Veículo ligado em {dia_nome} às {hora_fmt} — {motivo}. '
+            f'O uso NÃO é autorizado fora do horário comercial (Seg-Sex 08h-18h). '
             f'Este evento foi registrado para auditoria.'
         )
     else:
         tipo = 'autorizado'
         mensagem = (
             f'Veículo ligado em {dia_nome} às {hora_fmt}. '
-            f'Uso autorizado — dia útil.'
+            f'Uso autorizado — dia útil dentro do horário comercial.'
         )
 
     EventoIgnicao.objects.create(
@@ -498,7 +505,7 @@ def registrar_evento_ignicao(request, pk):
         'dia_semana': dia_nome,
         'hora': hora_fmt,
         'mensagem': mensagem,
-        'eh_fim_semana': eh_fim_semana,
+        'eh_fim_semana': eh_fora_horario,  # popup usa este campo para cor de alerta
     })
 
 

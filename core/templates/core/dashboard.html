@@ -501,15 +501,21 @@ const _prevIgnicao = {
 };
 
 function _registrarEventoIgnicao(v) {
+  const csrf = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
   fetch('/api/evento-ignicao/' + v.id + '/', {
     method: 'POST',
-    headers: {'X-CSRFToken': CSRF}
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'}
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
   .then(function(d) {
     if (d.ok) mostrarPopupIgnicao(v, d);
   })
-  .catch(function() {});
+  .catch(function(err) {
+    console.warn('[Ignição] Falha ao registrar evento para veículo', v.id, ':', err);
+  });
 }
 
 /* ── Atualização em tempo real dos cards de veículos ─────── */
