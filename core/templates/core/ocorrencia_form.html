@@ -179,9 +179,8 @@
           {% for arq in obj.arquivos.all %}
           {% if arq.eh_imagem %}
           <div class="foto-thumb" id="chip-{{ arq.pk }}">
-            <a href="{{ arq.arquivo.url }}" target="_blank">
-              <img src="{{ arq.arquivo.url }}" alt="{{ arq.nome_original }}">
-            </a>
+            <img src="{{ arq.arquivo.url }}" alt="{{ arq.nome_original }}"
+                 onclick="abrirLightbox('{{ arq.arquivo.url }}')">
             <button type="button" class="foto-del" onclick="deletarArquivo({{ arq.pk }}, 'ocorrencia')" title="Remover">✕</button>
             <div class="foto-nome">{{ arq.nome_original|truncatechars:18 }}</div>
           </div>
@@ -246,10 +245,28 @@
     </div>
   </form>
 </div>
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="fecharLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
+  <span onclick="fecharLightbox()" style="position:absolute;top:18px;right:24px;color:#fff;font-size:28px;cursor:pointer;line-height:1;">✕</span>
+  <img id="lightbox-img" src="" alt="" style="max-width:90vw;max-height:88vh;border-radius:10px;box-shadow:0 8px 60px rgba(0,0,0,.6);">
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+function abrirLightbox(url) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = url;
+  lb.style.display = 'flex';
+  document.addEventListener('keydown', _lbKey);
+}
+function fecharLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.removeEventListener('keydown', _lbKey);
+}
+function _lbKey(e) { if (e.key === 'Escape') fecharLightbox(); }
+
 /* Gerenciadores separados para fotos e documentos */
 let _fotos = new DataTransfer();
 let _docs  = new DataTransfer();

@@ -203,13 +203,24 @@
         </td>
         <td>
           {% if m.arquivos.all %}
-          <div class="arquivos-chips">
-            {% for arq in m.arquivos.all %}
-            <a href="{{ arq.arquivo.url }}" target="_blank" class="chip-arq" title="{{ arq.nome_original }}">
-              {% if arq.eh_imagem %}🖼{% else %}📄{% endif %} {{ arq.extensao|upper }}
-            </a>
-            {% endfor %}
-          </div>
+            <div class="foto-mini-row">
+              {% for arq in m.arquivos.all %}
+                {% if arq.eh_imagem %}
+                <img src="{{ arq.arquivo.url }}" class="foto-mini"
+                     onclick="abrirLightbox('{{ arq.arquivo.url }}')"
+                     title="{{ arq.nome_original }}">
+                {% endif %}
+              {% endfor %}
+            </div>
+            <div class="arquivos-chips">
+              {% for arq in m.arquivos.all %}
+                {% if not arq.eh_imagem %}
+                <a href="{{ arq.arquivo.url }}" target="_blank" class="chip-arq" title="{{ arq.nome_original }}">
+                  📄 {{ arq.extensao|upper }}
+                </a>
+                {% endif %}
+              {% endfor %}
+            </div>
           {% else %}<span style="color:var(--muted);font-size:11px">—</span>{% endif %}
         </td>
         <td>

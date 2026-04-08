@@ -42,6 +42,21 @@
   .del-arq { background:none; border:none; cursor:pointer; color:var(--muted); font-size:14px; padding:0; line-height:1; }
   .del-arq:hover { color:var(--red); }
 
+  /* Miniaturas de foto */
+  .foto-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-bottom:12px; }
+  .foto-thumb { position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--border2); background:var(--bg); aspect-ratio:4/3; }
+  .foto-thumb img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .2s; cursor:zoom-in; }
+  .foto-thumb:hover img { transform:scale(1.04); }
+  .foto-del { position:absolute; top:5px; right:5px; background:rgba(15,23,42,.7); color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .15s; }
+  .foto-thumb:hover .foto-del { opacity:1; }
+  .foto-nome { position:absolute; bottom:0; left:0; right:0; background:rgba(15,23,42,.6); color:#fff; font-size:9px; padding:3px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:var(--mono); }
+
+  /* Lightbox */
+  #lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:9999; align-items:center; justify-content:center; cursor:zoom-out; }
+  #lightbox.open { display:flex; }
+  #lightbox img { max-width:90vw; max-height:88vh; border-radius:10px; box-shadow:0 8px 60px rgba(0,0,0,.6); }
+  #lightbox-close { position:absolute; top:18px; right:24px; color:#fff; font-size:28px; cursor:pointer; line-height:1; }
+
   .form-footer { display:flex; gap:12px; margin-top:28px; }
 </style>
 {% endblock %}
@@ -129,15 +144,26 @@
       {% if obj and obj.arquivos.all %}
       <div class="form-row form-full">
         <label>Arquivos anexados</label>
+        {% with imagens=obj.arquivos.all|dictsort:"nome_original" %}
+        <div class="foto-grid" id="foto-grid-existente">
+          {% for arq in obj.arquivos.all %}{% if arq.eh_imagem %}
+          <div class="foto-thumb" id="chip-{{ arq.pk }}">
+            <img src="{{ arq.arquivo.url }}" alt="{{ arq.nome_original }}"
+                 onclick="abrirLightbox('{{ arq.arquivo.url }}')">
+            <button type="button" class="foto-del" onclick="deletarArquivo({{ arq.pk }}, 'manutencao')" title="Remover">✕</button>
+            <div class="foto-nome">{{ arq.nome_original|truncatechars:18 }}</div>
+          </div>
+          {% endif %}{% endfor %}
+        </div>
         <div class="existing-files">
-          {% for arq in obj.arquivos.all %}
+          {% for arq in obj.arquivos.all %}{% if not arq.eh_imagem %}
           <span class="existing-chip" id="chip-{{ arq.pk }}">
-            {% if arq.eh_imagem %}🖼{% else %}📄{% endif %}
-            <a href="{{ arq.arquivo.url }}" target="_blank">{{ arq.nome_original|default:arq.arquivo.name }}</a>
+            📄 <a href="{{ arq.arquivo.url }}" target="_blank">{{ arq.nome_original|default:arq.arquivo.name|truncatechars:30 }}</a>
             <button type="button" class="del-arq" onclick="deletarArquivo({{ arq.pk }}, 'manutencao')" title="Remover">✕</button>
           </span>
-          {% endfor %}
+          {% endif %}{% endfor %}
         </div>
+        {% endwith %}
       </div>
       {% endif %}
 
@@ -166,10 +192,27 @@
     </div>
   </form>
 </div>
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="fecharLightbox()">
+  <span id="lightbox-close" onclick="fecharLightbox()">✕</span>
+  <img id="lightbox-img" src="" alt="">
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+function abrirLightbox(url) {
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox').classList.add('open');
+  document.addEventListener('keydown', _lbKey);
+}
+function fecharLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.removeEventListener('keydown', _lbKey);
+}
+function _lbKey(e) { if (e.key === 'Escape') fecharLightbox(); }
+
 let _files = new DataTransfer();
 
 function onFiles(flist) {
