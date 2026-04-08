@@ -708,6 +708,24 @@
       btn.disabled = false;
     });
   }
+
+  /* Sync automático em background a cada 30s — sem tocar na UI do botão */
+  let _syncEmAndamento = false;
+  function _syncBackground() {
+    if (_syncEmAndamento) return;
+    _syncEmAndamento = true;
+    const dot = document.getElementById('sync-dot');
+    if (dot) dot.classList.add('syncing');
+    fetch('{% url "sync_agora" %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF}
+    })
+    .finally(() => {
+      _syncEmAndamento = false;
+      if (dot) dot.classList.remove('syncing');
+    });
+  }
+  setInterval(_syncBackground, 30000);
 </script>
 {% block extra_js %}{% endblock %}
 </body>

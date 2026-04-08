@@ -4,7 +4,6 @@
 {% block topbar_title %}<span>Tracking GPS</span> / Dashboard{% endblock %}
 
 {% block extra_head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   canvas { max-height: 200px; }
 
@@ -283,16 +282,6 @@
     <div class="kpi-value">{{ sem_sinal }}</div>
     <div class="kpi-label">Sem sinal</div>
   </div>
-  <div class="kpi" style="--kpi-color: var(--yellow)">
-    <span class="kpi-icon">⚠</span>
-    <div class="kpi-value">{{ alertas_hoje }}</div>
-    <div class="kpi-label">Alertas (24h)</div>
-  </div>
-  <div class="kpi" style="--kpi-color: var(--red)">
-    <span class="kpi-icon">!</span>
-    <div class="kpi-value">{{ alertas_nao_lidos }}</div>
-    <div class="kpi-label">Não lidos</div>
-  </div>
   <div class="kpi" style="--kpi-color: var(--red)">
     <span class="kpi-icon">⛔</span>
     <div class="kpi-value">{{ nao_autorizados_hoje }}</div>
@@ -300,21 +289,6 @@
   </div>
 </div>
 
-<!-- Gráficos -->
-<div class="grid-2" style="margin-bottom:24px">
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">Alertas por Hora (24h)</div>
-    </div>
-    <canvas id="chart-alertas"></canvas>
-  </div>
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">Eventos por Dia (7 dias)</div>
-    </div>
-    <canvas id="chart-eventos"></canvas>
-  </div>
-</div>
 
 <!-- Cards de Veículos -->
 <div class="card" style="margin-bottom:24px">
@@ -519,9 +493,6 @@
 
 {% block extra_js %}
 <script>
-const alertasData = {{ alertas_por_hora|safe }};
-const eventosData = {{ eventos_semana|safe }};
-
 /* ── Estado anterior de ignição (inicializado do servidor) ── */
 const _prevIgnicao = {
   {% for v in veiculos_cards %}
@@ -777,53 +748,6 @@ function editarKm(event, vid) {
   input.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
 }
 
-const chartDefaults = {
-  plugins: { legend: { display: false } },
-  scales: {
-    x: {
-      grid: { color: 'rgba(0,0,0,0.04)' },
-      ticks: { color: '#64748b', font: { family: 'Space Mono', size: 9 } }
-    },
-    y: {
-      grid: { color: 'rgba(0,0,0,0.04)' },
-      ticks: { color: '#64748b', font: { family: 'Space Mono', size: 9 }, stepSize: 1 },
-      beginAtZero: true
-    }
-  }
-};
-
-new Chart(document.getElementById('chart-alertas'), {
-  type: 'bar',
-  data: {
-    labels: alertasData.map(d => d.hora),
-    datasets: [{
-      data: alertasData.map(d => d.count),
-      backgroundColor: 'rgba(245,158,11,0.3)',
-      borderColor: '#f59e0b',
-      borderWidth: 1,
-      borderRadius: 2,
-    }]
-  },
-  options: { ...chartDefaults, responsive: true }
-});
-
-new Chart(document.getElementById('chart-eventos'), {
-  type: 'line',
-  data: {
-    labels: eventosData.map(d => d.dia),
-    datasets: [{
-      data: eventosData.map(d => d.count),
-      borderColor: '#3b82f6',
-      backgroundColor: 'rgba(59,130,246,0.1)',
-      borderWidth: 2,
-      fill: true,
-      tension: 0.3,
-      pointBackgroundColor: '#3b82f6',
-      pointRadius: 3,
-    }]
-  },
-  options: { ...chartDefaults, responsive: true }
-});
 
 /* ── Upload de foto do veículo ── */
 function uploadFoto(input) {

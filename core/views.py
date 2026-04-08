@@ -21,26 +21,9 @@ def dashboard(request):
     ultimo_dia = now - timedelta(hours=24)
 
     total_veiculos  = Vehicle.objects.filter(ativo=True).count()
-    ligados         = Vehicle.objects.filter(ativo=True, ignicao=True).count()
+    ligados         = Vehicle.objects.filter(ativo=True, ignicao=True, latitude__isnull=False, longitude__isnull=False).count()
     desligados      = Vehicle.objects.filter(ativo=True, ignicao=False).count()
-    sem_sinal       = Vehicle.objects.filter(ativo=True, ignicao=None).count()
-    alertas_hoje    = Alert.objects.filter(ocorrido_em__gte=ultimo_dia).count()
-    alertas_nao_lidos = Alert.objects.filter(lido=False).count()
-
-    # Gráfico: alertas por hora (últimas 24h)
-    alertas_por_hora = []
-    for h in range(23, -1, -1):
-        inicio = now - timedelta(hours=h+1)
-        fim    = now - timedelta(hours=h)
-        qt     = Alert.objects.filter(ocorrido_em__gte=inicio, ocorrido_em__lt=fim).count()
-        alertas_por_hora.append({'hora': fim.strftime('%H:%M'), 'count': qt})
-
-    # Gráfico: eventos por dia (últimos 7 dias)
-    eventos_semana = []
-    for d in range(6, -1, -1):
-        dia   = (now - timedelta(days=d)).date()
-        qt    = Event.objects.filter(ocorrido_em__date=dia).count()
-        eventos_semana.append({'dia': dia.strftime('%d/%m'), 'count': qt})
+    sem_sinal       = total_veiculos - ligados - desligados
 
     # Último sync
     ultimo_sync = SyncLog.objects.order_by('-iniciado_em').first()
@@ -65,10 +48,6 @@ def dashboard(request):
         'ligados':           ligados,
         'desligados':        desligados,
         'sem_sinal':         sem_sinal,
-        'alertas_hoje':      alertas_hoje,
-        'alertas_nao_lidos': alertas_nao_lidos,
-        'alertas_por_hora':  json.dumps(alertas_por_hora),
-        'eventos_semana':    json.dumps(eventos_semana),
         'ultimo_sync':       ultimo_sync,
         'alertas_recentes':      alertas_recentes,
         'veiculos_cards':        veiculos_cards,

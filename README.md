@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # FleetCore
 
 Dashboard de monitoramento de frota integrado com a API Fulltrack2.
@@ -90,3 +91,7 @@ fleetcore/
 │       └── relatorios.html
 └── manage.py
 ```
+=======
+# Tracking-GPS-Sistema-de-Rastreamento-e-Gestao-de-Frota
+Sistema de Rastreamento de Veiculo e Gestão de Frota
+>>>>>>> 45ff0d2c52d9674149dc2cb91f6a224c4a8e52e4
