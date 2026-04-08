@@ -8,6 +8,16 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+# ── CSRF — necessário para funcionar no PythonAnywhere (HTTPS via proxy) ──────
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.pythonanywhere.com',
+    'http://localhost',
+    'http://127.0.0.1',
+]
+# Garante que o cookie CSRF seja acessível pelo JavaScript (document.cookie)
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

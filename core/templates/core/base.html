@@ -538,6 +538,9 @@
   </div>
 </div>
 
+{% comment %}Token CSRF disponível para JS via document.querySelector('[name=csrfmiddlewaretoken]'){% endcomment %}
+<form id="csrf-form" style="display:none">{% csrf_token %}</form>
+
 <main class="main">
   <div class="content">
     {% if messages %}
@@ -552,7 +555,13 @@
 </main>
 
 <script>
-  const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+  /* CSRF token — lê do cookie (local) ou do meta tag (PythonAnywhere/HTTPS) */
+  function getCsrf() {
+    return document.cookie.match(/csrftoken=([^;]+)/)?.[1]
+        || document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || '';
+  }
+  const CSRF = getCsrf();
 
   /* ══ Sistema de Popup de Ignição (global) ══════════════════ */
   const _popupQueue = [];
