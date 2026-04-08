@@ -269,17 +269,17 @@
   </div>
   <div class="kpi" style="--kpi-color: var(--green)">
     <span class="kpi-icon">▲</span>
-    <div class="kpi-value">{{ ligados }}</div>
+    <div class="kpi-value" id="kpi-ligados">{{ ligados }}</div>
     <div class="kpi-label">Ligados</div>
   </div>
   <div class="kpi" style="--kpi-color: var(--red)">
     <span class="kpi-icon">■</span>
-    <div class="kpi-value">{{ desligados }}</div>
+    <div class="kpi-value" id="kpi-desligados">{{ desligados }}</div>
     <div class="kpi-label">Desligados</div>
   </div>
   <div class="kpi" style="--kpi-color: var(--muted)">
     <span class="kpi-icon">?</span>
-    <div class="kpi-value">{{ sem_sinal }}</div>
+    <div class="kpi-value" id="kpi-sem-sinal">{{ sem_sinal }}</div>
     <div class="kpi-label">Sem sinal</div>
   </div>
   <div class="kpi" style="--kpi-color: var(--red)">
@@ -635,6 +635,19 @@ function atualizarCards() {
           }
         }
       });
+
+      // Recalcula KPIs com a mesma lógica do mapa (exige lat+lng para contar como ligado)
+      const total = data.veiculos.length;
+      const ligados   = data.veiculos.filter(v => v.ignicao === true  && v.latitude != null && v.longitude != null).length;
+      const desligados= data.veiculos.filter(v => v.ignicao === false).length;
+      const semSinal  = total - ligados - desligados;
+      const elLig = document.getElementById('kpi-ligados');
+      const elDes = document.getElementById('kpi-desligados');
+      const elSem = document.getElementById('kpi-sem-sinal');
+      if (elLig) elLig.textContent = ligados;
+      if (elDes) elDes.textContent = desligados;
+      if (elSem) elSem.textContent = semSinal;
+
       // Reaplicar filtro de cidade após atualizar os cards
       if (_cidadeDash !== 'todos') _aplicarFiltroCidadeDash();
     })
