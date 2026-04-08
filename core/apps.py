@@ -25,17 +25,8 @@ class CoreConfig(AppConfig):
         connection_created.connect(_configurar_sqlite_wal)
 
         import sys
-
-        # Comandos de gerenciamento que NÃO devem iniciar o scheduler
-        _management_cmds = {
-            'migrate', 'makemigrations', 'collectstatic', 'shell',
-            'test', 'createsuperuser', 'check', 'showmigrations',
-            'sqlmigrate', 'dbshell', 'flush', 'loaddata', 'dumpdata',
-        }
-        _cmd = sys.argv[1] if len(sys.argv) > 1 else ''
-        _deve_iniciar = _cmd not in _management_cmds
-
-        if _deve_iniciar:
+        # Não inicia durante migrations ou testes
+        if 'runserver' in sys.argv or 'gunicorn' in sys.argv[0:1]:
             from core.scheduler import start
             start()
 
