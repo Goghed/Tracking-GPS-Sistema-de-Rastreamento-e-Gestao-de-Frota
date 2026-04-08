@@ -324,10 +324,11 @@ function getIcon(v) {
   if (_foraHorario(v)) {
     // Laranja pulsante = fora do horário autorizado e em movimento
     if (moving) return makeCarIcon('#f97316', dir, true);
+    if (idling) return makeCarIcon('#f97316', dir, false);
     return makeCarIcon('#ef4444', dir, false);
   }
   if (moving) return makeCarIcon('#16a34a', dir, true);
-  if (idling) return makeCarIcon('#dc2626', dir, false);
+  if (idling) return makeCarIcon('#16a34a', dir, false);  // ligado parado = verde
   if (v.ignicao === false) return makeCarIcon('#dc2626', dir, false);
   return makeCarIcon('#d97706', dir, false);
 }
