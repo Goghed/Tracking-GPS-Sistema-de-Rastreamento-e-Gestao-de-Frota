@@ -1,0 +1,203 @@
+{% extends 'core/base.html' %}
+{% block title %}Usuários — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / Usuários{% endblock %}
+
+{% block content %}
+<style>
+  .users-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+  .users-title  { font-size:22px; font-weight:700; color:var(--text); }
+  .users-sub    { font-size:12px; color:var(--muted); margin-top:2px; }
+
+  .users-table-wrap {
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:12px; overflow:hidden;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
+  }
+  table { width:100%; border-collapse:collapse; }
+  thead th {
+    padding:12px 18px; text-align:left;
+    font-family:var(--mono); font-size:10px; font-weight:700;
+    letter-spacing:1.5px; text-transform:uppercase; color:var(--muted);
+    background:var(--bg); border-bottom:1px solid var(--border2);
+  }
+  tbody tr { border-bottom:1px solid var(--border2); transition:background .15s; }
+  tbody tr:last-child { border-bottom:none; }
+  tbody tr:hover { background:rgba(59,130,246,.04); }
+  tbody td { padding:14px 18px; font-size:13px; color:var(--text); vertical-align:middle; }
+
+  .user-avatar {
+    width:34px; height:34px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),#7c3aed);
+    display:inline-flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:700; font-size:13px; margin-right:10px;
+    flex-shrink:0;
+  }
+  .user-name-cell { display:flex; align-items:center; }
+  .user-fullname { font-weight:600; color:var(--text); }
+  .user-username { font-size:11px; color:var(--muted); font-family:var(--mono); }
+
+  .badge-staff {
+    display:inline-flex; align-items:center; gap:4px;
+    background:rgba(59,130,246,.1); color:var(--accent);
+    font-size:10px; font-weight:700; font-family:var(--mono);
+    padding:2px 8px; border-radius:20px; letter-spacing:.5px;
+  }
+  .badge-user {
+    display:inline-flex; align-items:center; gap:4px;
+    background:rgba(100,116,139,.1); color:var(--muted);
+    font-size:10px; font-weight:700; font-family:var(--mono);
+    padding:2px 8px; border-radius:20px; letter-spacing:.5px;
+  }
+  .badge-super {
+    background:rgba(124,58,237,.12); color:#7c3aed;
+    font-size:10px; font-weight:700; font-family:var(--mono);
+    padding:2px 8px; border-radius:20px; letter-spacing:.5px;
+    display:inline-flex;
+  }
+
+  .action-btns { display:flex; gap:8px; }
+  .btn-edit {
+    padding:5px 12px; font-size:11px; border-radius:6px; cursor:pointer;
+    border:1px solid var(--border2); background:var(--bg);
+    color:var(--text); text-decoration:none; font-family:var(--mono);
+    transition:all .15s;
+  }
+  .btn-edit:hover { border-color:var(--accent); color:var(--accent); background:rgba(59,130,246,.06); }
+  .btn-del {
+    padding:5px 12px; font-size:11px; border-radius:6px; cursor:pointer;
+    border:1px solid transparent; background:rgba(239,68,68,.08);
+    color:#dc2626; font-family:var(--mono); transition:all .15s;
+  }
+  .btn-del:hover { background:rgba(239,68,68,.18); }
+
+  .empty-state {
+    text-align:center; padding:60px 20px;
+    color:var(--muted); font-size:14px;
+  }
+
+  /* Messages */
+  .msg-ok  { background:rgba(16,185,129,.1); color:#059669; border:1px solid rgba(16,185,129,.25);
+             padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
+  .msg-err { background:rgba(239,68,68,.1);  color:#dc2626; border:1px solid rgba(239,68,68,.25);
+             padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
+
+  /* Modal de confirmação de exclusão */
+  .modal-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(15,23,42,.5); z-index:9000;
+    align-items:center; justify-content:center;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-box {
+    background:#fff; border-radius:14px; padding:28px 32px;
+    width:100%; max-width:380px;
+    box-shadow:0 24px 60px rgba(0,0,0,.18);
+  }
+  .modal-title { font-size:17px; font-weight:700; color:#0f172a; margin-bottom:8px; }
+  .modal-sub   { font-size:13px; color:#64748b; margin-bottom:24px; line-height:1.5; }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+</style>
+
+<div class="users-header">
+  <div>
+    <div class="users-title">Usuários</div>
+    <div class="users-sub">Gerencie quem tem acesso ao sistema</div>
+  </div>
+  <a href="{% url 'usuario_criar' %}" class="btn btn-primary" style="font-size:13px;padding:8px 18px;">
+    + Novo usuário
+  </a>
+</div>
+
+{% for msg in messages %}
+  {% if msg.tags == 'success' %}<div class="msg-ok">{{ msg }}</div>{% endif %}
+  {% if msg.tags == 'error'   %}<div class="msg-err">{{ msg }}</div>{% endif %}
+{% endfor %}
+
+<div class="users-table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Usuário</th>
+        <th>E-mail</th>
+        <th>Nível</th>
+        <th>Último acesso</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <td>
+          <div class="user-name-cell">
+            <div class="user-avatar">{{ u.username|first|upper }}</div>
+            <div>
+              <div class="user-fullname">{{ u.get_full_name|default:u.username }}</div>
+              <div class="user-username">@{{ u.username }}</div>
+            </div>
+          </div>
+        </td>
+        <td style="color:var(--muted)">{{ u.email|default:"—" }}</td>
+        <td>
+          {% if u.is_superuser %}
+            <span class="badge-super">★ Super Admin</span>
+          {% elif u.is_staff %}
+            <span class="badge-staff">● Admin</span>
+          {% else %}
+            <span class="badge-user">Padrão</span>
+          {% endif %}
+        </td>
+        <td style="color:var(--muted);font-family:var(--mono);font-size:11px">
+          {% if u.last_login %}{{ u.last_login|date:"d/m/Y H:i" }}{% else %}—{% endif %}
+        </td>
+        <td>
+          <div class="action-btns">
+            <a href="{% url 'usuario_editar' u.pk %}" class="btn-edit">Editar</a>
+            {% if u != request.user %}
+            <button class="btn-del" onclick="confirmarDelete({{ u.pk }}, '{{ u.username }}')">Excluir</button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5"><div class="empty-state">Nenhum usuário cadastrado.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal de confirmação -->
+<div class="modal-overlay" id="modal-del">
+  <div class="modal-box">
+    <div class="modal-title">Excluir usuário?</div>
+    <div class="modal-sub" id="modal-del-msg"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="fecharModal()" style="font-size:13px;padding:7px 16px;">Cancelar</button>
+      <form id="form-del" method="post" style="margin:0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary"
+                style="font-size:13px;padding:7px 16px;background:#ef4444;border-color:#ef4444;">
+          Excluir
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmarDelete(pk, username) {
+  document.getElementById('modal-del-msg').textContent =
+    `Tem certeza que deseja excluir o usuário "${username}"? Esta ação não pode ser desfeita.`;
+  document.getElementById('form-del').action = `/usuarios/${pk}/deletar/`;
+  document.getElementById('modal-del').classList.add('open');
+}
+function fecharModal() {
+  document.getElementById('modal-del').classList.remove('open');
+}
+document.getElementById('modal-del').addEventListener('click', function(e) {
+  if (e.target === this) fecharModal();
+});
+</script>
+{% endblock %}

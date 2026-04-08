@@ -1,0 +1,350 @@
+{% extends 'core/base.html' %}
+{% block title %}{{ veiculo.placa }} — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / Veículos / {{ veiculo.placa }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .km-edit-btn {
+    background: rgba(59,130,246,.08);
+    border: 1px solid rgba(59,130,246,.25);
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    transition: all .15s;
+    font-family: var(--mono);
+    font-weight: 700;
+  }
+  .km-edit-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .km-field-input {
+    font-family: var(--mono); font-size: 13px;
+    padding: 3px 8px; border: 1px solid var(--accent);
+    border-radius: 4px; background: var(--bg2); color: var(--text);
+    outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+    width: 130px;
+  }
+  .km-hoje-pill {
+    display: inline-block;
+    background: rgba(16,185,129,.12); color: #059669;
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 20px;
+  }
+  .detail-td-label { color: var(--muted); padding: 5px 0; padding-right: 16px; white-space: nowrap; }
+  .detail-td-val   { padding: 5px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">{{ veiculo.placa }}</div>
+    <div class="page-sub">{{ veiculo.descricao }}</div>
+  </div>
+  <a href="{% url 'veiculos' %}" class="btn btn-ghost">← Voltar</a>
+</div>
+
+<div class="grid-3" style="margin-bottom:24px">
+  <!-- Identificação -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:14px">Identificação</div>
+    <table style="font-size:13px;width:100%">
+      <tr><td class="detail-td-label">Placa</td><td class="detail-td-val mono">{{ veiculo.placa }}</td></tr>
+      <tr><td class="detail-td-label">Chassi</td><td class="detail-td-val mono">{{ veiculo.chassi|default:"—" }}</td></tr>
+      <tr><td class="detail-td-label">Ano</td><td class="detail-td-val">{{ veiculo.ano|default:"—" }}</td></tr>
+      <tr><td class="detail-td-label">Cor</td><td class="detail-td-val">{{ veiculo.cor|default:"—" }}</td></tr>
+      <tr><td class="detail-td-label">Modelo</td><td class="detail-td-val">{{ veiculo.modelo|default:"—" }}</td></tr>
+      <tr><td class="detail-td-label">Fabricante</td><td class="detail-td-val">{{ veiculo.fabricante|default:"—" }}</td></tr>
+    </table>
+  </div>
+
+  <!-- Status atual -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:14px">Status atual</div>
+    <div style="font-size:28px;font-family:var(--mono);font-weight:700;color:var(--{{ veiculo.status_color }})">
+      {{ veiculo.status_display }}
+    </div>
+    <div style="margin-top:14px;font-size:13px">
+      <div style="color:var(--muted);margin-bottom:4px">Velocidade</div>
+      <div class="mono">{% if veiculo.velocidade_atual %}{{ veiculo.velocidade_atual|floatformat:0 }} km/h{% else %}—{% endif %}</div>
+    </div>
+    <div style="margin-top:10px;font-size:13px">
+      <div style="color:var(--muted);margin-bottom:4px">Última posição</div>
+      <div class="mono" style="font-size:11px">{% if veiculo.ultima_posicao %}{{ veiculo.ultima_posicao|date:"d/m/Y H:i:s" }}{% else %}—{% endif %}</div>
+    </div>
+    {% if veiculo.latitude %}
+    <div style="margin-top:10px;font-size:13px">
+      <div style="color:var(--muted);margin-bottom:4px">Coordenadas</div>
+      <div class="mono" style="font-size:11px">{{ veiculo.latitude|floatformat:6 }}, {{ veiculo.longitude|floatformat:6 }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Técnico -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:14px">Técnico</div>
+    <table style="font-size:13px;width:100%">
+      <tr><td class="detail-td-label">Combustível</td><td class="detail-td-val">{{ veiculo.combustivel|default:"—" }}</td></tr>
+      <tr><td class="detail-td-label">Consumo</td><td class="detail-td-val">{% if veiculo.consumo %}{{ veiculo.consumo }} km/l{% else %}—{% endif %}</td></tr>
+      <tr><td class="detail-td-label">Vel. limite</td><td class="detail-td-val">{% if veiculo.velocidade_limite %}{{ veiculo.velocidade_limite }} km/h{% else %}—{% endif %}</td></tr>
+      <tr><td class="detail-td-label">Equipamento</td><td class="detail-td-val mono" style="font-size:11px">{{ veiculo.equipamento|default:"—" }}</td></tr>
+      <tr><td class="detail-td-label">Odo. API</td><td class="detail-td-val mono">{{ veiculo.odometro|default:"—" }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Foto do veículo -->
+<div class="card" style="margin-bottom:24px">
+  <div class="card-header">
+    <div class="card-title">Foto do Veículo</div>
+  </div>
+  <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap">
+    <!-- Preview -->
+    <div id="foto-preview-wrap" style="position:relative;flex-shrink:0">
+      {% if veiculo.foto %}
+        <img id="foto-preview" src="{{ veiculo.foto.url }}" alt="{{ veiculo.placa }}"
+             style="width:260px;height:160px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);">
+      {% else %}
+        <div id="foto-preview" style="width:260px;height:160px;border-radius:10px;border:2px dashed var(--border2);
+             background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted)">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/>
+            <path d="M9 5l1.5-2h3L15 5"/>
+          </svg>
+          <span style="font-size:12px">Sem foto</span>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Ações -->
+    <div style="display:flex;flex-direction:column;gap:10px;justify-content:center">
+      <label for="foto-file-input" class="btn btn-primary" style="cursor:pointer;font-size:13px;padding:9px 20px;display:inline-flex;align-items:center;gap:6px">
+        📷 Escolher foto
+      </label>
+      <input type="file" id="foto-file-input" accept="image/*" style="display:none"
+             data-vid="{{ veiculo.pk }}" onchange="uploadFotoDetalhe(this)">
+      <div id="foto-status" style="font-size:12px;color:var(--muted);font-family:var(--mono)"></div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.5">
+        JPG, PNG ou WEBP.<br>A foto aparece no card do dashboard.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KM Card (largura total) -->
+<div class="card" style="margin-bottom:24px">
+  <div class="card-header">
+    <div class="card-title">⊙ Quilometragem</div>
+    <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">
+      Clique no valor do KM base para editar
+    </span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px">
+
+    <!-- KM Base -->
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+        KM Base (odômetro atual)
+      </div>
+
+      <!-- Modo visualização -->
+      <div id="km-view" style="display:flex;align-items:center;gap:8px">
+        <span id="km-base-val" class="mono" style="font-size:24px;font-weight:700;color:var(--text)">{% if veiculo.km_base is not None %}{{ veiculo.km_base|floatformat:0 }}{% else %}—{% endif %}</span>
+        <span style="font-size:13px;color:var(--muted)">km</span>
+        <button class="km-edit-btn" onclick="abrirEdicaoKm()">✎ editar</button>
+      </div>
+
+      <!-- Modo edição -->
+      <div id="km-edit" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+        <input type="number" id="km-input" class="km-field-input"
+               placeholder="Ex: 45000" min="0" step="1">
+        <button onclick="salvarKm()" class="btn btn-primary" style="padding:5px 14px;font-size:11px">Salvar</button>
+        <button onclick="cancelarKm()" class="btn btn-ghost"  style="padding:5px 10px;font-size:11px">✕</button>
+      </div>
+
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Inserido manualmente — Enter para salvar, Esc para cancelar</div>
+    </div>
+
+    <!-- KM Hoje -->
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+        KM percorrido hoje
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="mono" style="font-size:24px;font-weight:700;color:var(--green)">
+          {{ veiculo.km_percorrido_hoje|floatformat:1 }}
+        </span>
+        <span style="font-size:13px;color:var(--muted)">km</span>
+        {% if veiculo.km_percorrido_hoje > 0 %}
+        <span class="km-hoje-pill">+{{ veiculo.km_percorrido_hoje|floatformat:1 }} hoje</span>
+        {% endif %}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Calculado automaticamente (atualiza a cada 5 min)</div>
+    </div>
+
+    <!-- Total estimado -->
+    {% if veiculo.km_base is not None %}
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+        Total estimado
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="mono" style="font-size:24px;font-weight:700;color:var(--accent)">
+          {{ veiculo.km_total_estimado|floatformat:1 }}
+        </span>
+        <span style="font-size:13px;color:var(--muted)">km</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Base + km de hoje</div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Alertas -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Últimos Alertas</div>
+      <span class="badge badge-gray">{{ alertas|length }}</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Sev.</th></tr></thead>
+        <tbody>
+          {% for a in alertas %}
+          <tr>
+            <td class="mono" style="font-size:11px">{{ a.ocorrido_em|date:"d/m H:i" }}</td>
+            <td>{{ a.tipo }}</td>
+            <td>
+              {% if a.severidade == 'danger' %}<span class="badge badge-red">CRÍTICO</span>
+              {% elif a.severidade == 'warning' %}<span class="badge badge-yellow">ATENÇÃO</span>
+              {% else %}<span class="badge badge-blue">INFO</span>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">Nenhum alerta.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Eventos -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Últimos Eventos</div>
+      <span class="badge badge-gray">{{ eventos|length }}</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Velocidade</th></tr></thead>
+        <tbody>
+          {% for e in eventos %}
+          <tr>
+            <td class="mono" style="font-size:11px">{{ e.ocorrido_em|date:"d/m H:i" }}</td>
+            <td>{{ e.tipo }}</td>
+            <td class="mono">{% if e.velocidade %}{{ e.velocidade|floatformat:0 }} km/h{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">Nenhum evento.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// CSRF já declarado no base.html — não redeclarar
+const VID  = {{ veiculo.pk }};
+
+const elView  = document.getElementById('km-view');
+const elEdit  = document.getElementById('km-edit');
+const elVal   = document.getElementById('km-base-val');
+const elInput = document.getElementById('km-input');
+
+function abrirEdicaoKm() {
+  const atual = elVal.textContent.trim();
+  elInput.value = atual === '—' ? '' : atual.replace(/\D/g, '');
+  elView.style.display = 'none';
+  elEdit.style.display = 'flex';
+  elInput.focus();
+  elInput.select();
+}
+
+function cancelarKm() {
+  elEdit.style.display = 'none';
+  elView.style.display = 'flex';
+}
+
+function salvarKm() {
+  const km = parseInt(elInput.value, 10);
+  if (isNaN(km) || km < 0) { cancelarKm(); return; }
+
+  fetch('/api/km-base/' + VID + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'km=' + km
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) elVal.textContent = km.toLocaleString('pt-BR');
+    cancelarKm();
+  })
+  .catch(function() { cancelarKm(); });
+}
+
+elInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter')  { e.preventDefault(); salvarKm(); }
+  if (e.key === 'Escape') { cancelarKm(); }
+});
+
+/* ── Upload de foto ── */
+function uploadFotoDetalhe(input) {
+  const vid    = input.dataset.vid;
+  const file   = input.files[0];
+  const status = document.getElementById('foto-status');
+  if (!file) return;
+
+  status.textContent = 'Enviando...';
+
+  // Prévia imediata
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const preview = document.getElementById('foto-preview');
+    if (preview.tagName === 'IMG') {
+      preview.src = e.target.result;
+    } else {
+      const img = document.createElement('img');
+      img.id    = 'foto-preview';
+      img.src   = e.target.result;
+      img.alt   = '';
+      img.style.cssText = 'width:260px;height:160px;object-fit:cover;border-radius:10px;border:1px solid var(--border2)';
+      preview.replaceWith(img);
+    }
+  };
+  reader.readAsDataURL(file);
+
+  const form = new FormData();
+  form.append('foto', file);
+
+  fetch(`/api/foto/${vid}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF },
+    body: form,
+  })
+  .then(r => r.json())
+  .then(d => {
+    status.textContent = d.ok ? '✓ Foto salva' : '✗ ' + (d.erro || 'Erro');
+    status.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 3000);
+  })
+  .catch(() => { status.textContent = '✗ Erro ao enviar'; status.style.color = 'var(--red)'; });
+
+  input.value = '';
+}
+</script>
+{% endblock %}

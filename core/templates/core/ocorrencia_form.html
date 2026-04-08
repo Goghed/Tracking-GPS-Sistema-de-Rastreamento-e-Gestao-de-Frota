@@ -1,0 +1,351 @@
+{% extends 'core/base.html' %}
+{% block title %}{% if obj %}Editar Ocorrência{% else %}Nova Ocorrência{% endif %} — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / <a href="{% url 'frota' %}?aba=ocorrencias" style="color:var(--muted);text-decoration:none;">Gestão de Frota</a> / {% if obj %}Editar Ocorrência{% else %}Nova Ocorrência{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .form-card { background:var(--bg2); border:1px solid var(--border2); border-radius:14px; padding:32px; max-width:720px; }
+  .form-title { font-size:20px; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .form-sub   { font-size:12px; color:var(--muted); margin-bottom:28px; }
+  .form-grid  { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .form-row   { margin-bottom:18px; }
+  .form-full  { grid-column:1/-1; }
+  label { display:block; font-size:11px; font-weight:700; font-family:var(--mono); text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:6px; }
+  input[type=text],input[type=number],input[type=date],select,textarea {
+    width:100%; padding:10px 13px; border-radius:8px; border:1px solid var(--border2);
+    background:var(--bg); color:var(--text); font-size:13px; outline:none; box-sizing:border-box;
+  }
+  input:focus,select:focus,textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,130,246,.1); }
+  textarea { min-height:100px; resize:vertical; font-family:inherit; }
+
+  .upload-zone {
+    border:2px dashed var(--border2); border-radius:10px; padding:24px;
+    text-align:center; cursor:pointer; transition:all .15s; background:var(--bg);
+  }
+  .upload-zone:hover,.upload-zone.drag { border-color:var(--accent); background:rgba(59,130,246,.04); }
+  .upload-zone input { display:none; }
+  .upload-icon { font-size:28px; margin-bottom:8px; }
+  .upload-txt  { font-size:13px; color:var(--muted); }
+  .upload-txt strong { color:var(--accent); cursor:pointer; }
+  .upload-hint { font-size:11px; color:var(--muted); margin-top:4px; }
+  .file-list   { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .file-chip   { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:8px; background:var(--bg2); border:1px solid var(--border2); font-size:12px; }
+  .file-chip .rm { cursor:pointer; color:var(--muted); font-size:14px; line-height:1; }
+  .file-chip .rm:hover { color:var(--red); }
+  .existing-chip { display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:8px; background:var(--bg); border:1px solid var(--border2); font-size:12px; margin:4px 4px 4px 0; }
+  .existing-chip a { color:var(--accent); text-decoration:none; }
+  .del-arq { background:none; border:none; cursor:pointer; color:var(--muted); font-size:14px; padding:0; }
+  .del-arq:hover { color:var(--red); }
+  .form-footer { display:flex; gap:12px; margin-top:28px; }
+
+  /* Alerta visual para grave */
+  .gravidade-select { border-left:4px solid transparent; }
+
+  /* ── Fotos ── */
+  .foto-upload-zone {
+    border:2px dashed var(--border2); border-radius:12px; padding:28px 20px;
+    text-align:center; cursor:pointer; transition:all .15s; background:var(--bg);
+    margin-bottom:14px;
+  }
+  .foto-upload-zone:hover, .foto-upload-zone.drag {
+    border-color:#3b82f6; background:rgba(59,130,246,.04);
+  }
+  .foto-upload-icon { font-size:32px; margin-bottom:6px; }
+  .foto-upload-txt  { font-size:13px; color:var(--muted); }
+  .foto-upload-txt strong { color:var(--accent); }
+  .foto-upload-hint { font-size:11px; color:var(--muted); margin-top:3px; }
+
+  .foto-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .foto-thumb {
+    position:relative; border-radius:10px; overflow:hidden;
+    border:1px solid var(--border2); background:var(--bg);
+    aspect-ratio:4/3;
+  }
+  .foto-thumb img {
+    width:100%; height:100%; object-fit:cover; display:block;
+    transition:transform .2s;
+  }
+  .foto-thumb:hover img { transform:scale(1.04); }
+  .foto-del {
+    position:absolute; top:5px; right:5px;
+    background:rgba(15,23,42,.7); color:#fff;
+    border:none; border-radius:50%; width:22px; height:22px;
+    font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    opacity:0; transition:opacity .15s;
+  }
+  .foto-thumb:hover .foto-del { opacity:1; }
+  .foto-nome {
+    position:absolute; bottom:0; left:0; right:0;
+    background:rgba(15,23,42,.6); color:#fff;
+    font-size:9px; padding:3px 6px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    font-family:var(--mono);
+  }
+  .foto-thumb-new { cursor:default; }
+  .foto-thumb-new .foto-del { opacity:1; background:rgba(239,68,68,.8); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-card">
+  <div class="form-title">{% if obj %}Editar Ocorrência{% else %}Registrar Ocorrência{% endif %}</div>
+  <div class="form-sub">{% if obj %}Editando ocorrência de {{ obj.vehicle.placa }} — {{ obj.data_ocorrencia|date:"d/m/Y" }}{% else %}Registre um acidente, multa ou qualquer ocorrência com o veículo{% endif %}</div>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-grid">
+
+      <div class="form-row">
+        <label>Veículo *</label>
+        <select name="vehicle" required>
+          <option value="">Selecione...</option>
+          {% for v in veiculos %}
+          <option value="{{ v.pk }}" {% if obj and obj.vehicle_id == v.pk %}selected{% endif %}>{{ v.placa }}{% if v.descricao %} — {{ v.descricao|truncatechars:25 }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Data da ocorrência *</label>
+        <input type="date" name="data_ocorrencia" required value="{% if obj %}{{ obj.data_ocorrencia|date:'Y-m-d' }}{% endif %}">
+      </div>
+
+      <div class="form-row">
+        <label>Tipo *</label>
+        <select name="tipo" required>
+          <option value="acidente"   {% if not obj or obj.tipo == 'acidente'   %}selected{% endif %}>🚗 Acidente</option>
+          <option value="multa"      {% if obj and obj.tipo == 'multa'          %}selected{% endif %}>📋 Multa</option>
+          <option value="furto"      {% if obj and obj.tipo == 'furto'          %}selected{% endif %}>🔓 Furto / Roubo</option>
+          <option value="vandalismo" {% if obj and obj.tipo == 'vandalismo'     %}selected{% endif %}>Vandalismo</option>
+          <option value="avaria"     {% if obj and obj.tipo == 'avaria'         %}selected{% endif %}>Avaria</option>
+          <option value="outros"     {% if obj and obj.tipo == 'outros'         %}selected{% endif %}>Outros</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Gravidade</label>
+        <select name="gravidade" id="gravidade-sel" class="gravidade-select" onchange="updateGravidade(this)">
+          <option value="leve"     {% if not obj or obj.gravidade == 'leve'     %}selected{% endif %}>Leve</option>
+          <option value="moderada" {% if obj and obj.gravidade == 'moderada'    %}selected{% endif %}>Moderada</option>
+          <option value="grave"    {% if obj and obj.gravidade == 'grave'       %}selected{% endif %}>Grave</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Status</label>
+        <select name="status">
+          <option value="aberta"     {% if not obj or obj.status == 'aberta'     %}selected{% endif %}>Aberta</option>
+          <option value="em_analise" {% if obj and obj.status == 'em_analise'    %}selected{% endif %}>Em análise</option>
+          <option value="resolvida"  {% if obj and obj.status == 'resolvida'     %}selected{% endif %}>Resolvida</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Custo estimado (R$)</label>
+        <input type="number" name="custo_estimado" step="0.01" min="0"
+               value="{% if obj and obj.custo_estimado %}{{ obj.custo_estimado }}{% endif %}"
+               placeholder="0,00">
+      </div>
+
+      <div class="form-row form-full">
+        <label>Local da ocorrência</label>
+        <input type="text" name="local" maxlength="200"
+               value="{% if obj %}{{ obj.local }}{% endif %}"
+               placeholder="Ex: Av. Brasil, 1200 — Londrina / PR">
+      </div>
+
+      <div class="form-row form-full">
+        <label>Descrição *</label>
+        <textarea name="descricao" required placeholder="Descreva o que aconteceu com detalhes: circunstâncias, danos, terceiros envolvidos...">{% if obj %}{{ obj.descricao }}{% endif %}</textarea>
+      </div>
+
+      <div class="form-row form-full">
+        <label>Observações / Tratativas</label>
+        <textarea name="observacoes" placeholder="Boletim de ocorrência, seguradora, providências tomadas...">{% if obj %}{{ obj.observacoes }}{% endif %}</textarea>
+      </div>
+
+      <!-- ── Fotos do sinistro ── -->
+      <div class="form-row form-full">
+        <label>📷 Fotos do veículo / sinistro</label>
+
+        <!-- Fotos existentes em grid -->
+        {% if obj and obj.arquivos.all %}
+        <div class="foto-grid" id="foto-grid-existente">
+          {% for arq in obj.arquivos.all %}
+          {% if arq.eh_imagem %}
+          <div class="foto-thumb" id="chip-{{ arq.pk }}">
+            <a href="{{ arq.arquivo.url }}" target="_blank">
+              <img src="{{ arq.arquivo.url }}" alt="{{ arq.nome_original }}">
+            </a>
+            <button type="button" class="foto-del" onclick="deletarArquivo({{ arq.pk }}, 'ocorrencia')" title="Remover">✕</button>
+            <div class="foto-nome">{{ arq.nome_original|truncatechars:18 }}</div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Área de upload de fotos com preview -->
+        <div class="foto-upload-zone" id="foto-zone"
+             ondragover="event.preventDefault();this.classList.add('drag')"
+             ondragleave="this.classList.remove('drag')"
+             ondrop="onDropFotos(event)"
+             onclick="document.getElementById('foto-input').click()">
+          <input type="file" id="foto-input" name="arquivos" multiple accept="image/*" onchange="onFotos(this.files)" style="display:none">
+          <div class="foto-upload-icon">📷</div>
+          <div class="foto-upload-txt"><strong>Clique ou arraste fotos aqui</strong></div>
+          <div class="foto-upload-hint">JPG, PNG, WEBP — múltiplas fotos permitidas</div>
+        </div>
+
+        <!-- Preview das fotos selecionadas -->
+        <div class="foto-grid" id="foto-preview-grid"></div>
+      </div>
+
+      <!-- ── Documentos (BO, orçamentos, etc.) ── -->
+      <div class="form-row form-full">
+        <label>📄 Documentos (BO, orçamentos, laudos)</label>
+
+        <!-- Docs existentes -->
+        {% if obj and obj.arquivos.all %}
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px" id="docs-existentes">
+          {% for arq in obj.arquivos.all %}
+          {% if not arq.eh_imagem %}
+          <span class="existing-chip" id="chip-{{ arq.pk }}">
+            📄 <a href="{{ arq.arquivo.url }}" target="_blank">{{ arq.nome_original|default:arq.arquivo.name|truncatechars:30 }}</a>
+            <button type="button" class="del-arq" onclick="deletarArquivo({{ arq.pk }}, 'ocorrencia')">✕</button>
+          </span>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="upload-zone" onclick="document.getElementById('doc-input').click()"
+             ondragover="event.preventDefault();this.classList.add('drag')"
+             ondragleave="this.classList.remove('drag')"
+             ondrop="onDropDocs(event)">
+          <input type="file" id="doc-input" name="arquivos" multiple accept=".pdf,.doc,.docx,.xls,.xlsx" onchange="onDocs(this.files)">
+          <div class="upload-icon">📎</div>
+          <div class="upload-txt"><strong>Clique para selecionar</strong> ou arraste aqui</div>
+          <div class="upload-hint">PDF, Word, Excel</div>
+        </div>
+        <div class="file-list" id="file-list"></div>
+      </div>
+
+    </div>
+
+    <div class="form-footer">
+      <a href="{% url 'frota' %}?aba=ocorrencias" class="btn btn-ghost" style="font-size:13px;padding:9px 18px;">Cancelar</a>
+      <button type="submit" class="btn btn-primary" style="font-size:13px;padding:9px 22px;">
+        {% if obj %}Salvar alterações{% else %}Registrar ocorrência{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Gerenciadores separados para fotos e documentos */
+let _fotos = new DataTransfer();
+let _docs  = new DataTransfer();
+
+/* ── Fotos ── */
+function onFotos(flist) {
+  for (const f of flist) _fotos.items.add(f);
+  syncInputFotos();
+  renderPreviews();
+}
+function onDropFotos(e) {
+  e.preventDefault();
+  document.getElementById('foto-zone').classList.remove('drag');
+  onFotos(e.dataTransfer.files);
+}
+function syncInputFotos() {
+  document.getElementById('foto-input').files = _fotos.files;
+}
+function renderPreviews() {
+  const grid = document.getElementById('foto-preview-grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < _fotos.files.length; i++) {
+    const f = _fotos.files[i];
+    const thumb = document.createElement('div');
+    thumb.className = 'foto-thumb foto-thumb-new';
+    thumb.innerHTML = `
+      <img src="" alt="${f.name}">
+      <button type="button" class="foto-del" onclick="removeFoto(${i})">✕</button>
+      <div class="foto-nome">${f.name}</div>`;
+    grid.appendChild(thumb);
+    const img = thumb.querySelector('img');
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; };
+    reader.readAsDataURL(f);
+  }
+}
+function removeFoto(idx) {
+  const dt = new DataTransfer();
+  for (let i = 0; i < _fotos.files.length; i++) {
+    if (i !== idx) dt.items.add(_fotos.files[i]);
+  }
+  _fotos = dt;
+  syncInputFotos();
+  renderPreviews();
+}
+
+/* ── Documentos ── */
+function onDocs(flist) {
+  for (const f of flist) _docs.items.add(f);
+  syncInputDocs();
+  renderDocChips();
+}
+function onDropDocs(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  onDocs(e.dataTransfer.files);
+}
+function syncInputDocs() {
+  document.getElementById('doc-input').files = _docs.files;
+}
+function renderDocChips() {
+  const list = document.getElementById('file-list');
+  list.innerHTML = '';
+  for (let i = 0; i < _docs.files.length; i++) {
+    const f = _docs.files[i];
+    const chip = document.createElement('span');
+    chip.className = 'file-chip';
+    chip.innerHTML = `📄 ${f.name} <span class="rm" onclick="removeDoc(${i})">✕</span>`;
+    list.appendChild(chip);
+  }
+}
+function removeDoc(idx) {
+  const dt = new DataTransfer();
+  for (let i = 0; i < _docs.files.length; i++) {
+    if (i !== idx) dt.items.add(_docs.files[i]);
+  }
+  _docs = dt;
+  syncInputDocs();
+  renderDocChips();
+}
+
+/* ── Deletar arquivo existente ── */
+function deletarArquivo(pk, tipo) {
+  if (!confirm('Remover este arquivo?')) return;
+  fetch(`/frota/${tipo}/arquivo/${pk}/deletar/`, {
+    method:'POST', headers:{'X-CSRFToken': CSRF}
+  }).then(r => r.json()).then(d => {
+    if (d.ok) document.getElementById(`chip-${pk}`)?.remove();
+  });
+}
+
+/* ── Gravidade ── */
+function updateGravidade(sel) {
+  const colors = { leve:'#22c55e', moderada:'#f59e0b', grave:'#ef4444' };
+  sel.style.borderLeftColor = colors[sel.value] || 'transparent';
+}
+updateGravidade(document.getElementById('gravidade-sel'));
+</script>
+{% endblock %}

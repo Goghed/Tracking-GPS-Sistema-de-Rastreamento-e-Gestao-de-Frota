@@ -1,0 +1,408 @@
+{% extends 'core/base.html' %}
+{% block title %}Gestão de Frota — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / Gestão de Frota{% endblock %}
+
+{% block extra_head %}
+<style>
+  .tabs { display:flex; gap:4px; margin-bottom:20px; flex-wrap:wrap; }
+  .tab-btn {
+    padding:8px 18px; border-radius:8px; border:1px solid var(--border2);
+    background:var(--bg2); color:var(--muted); font-size:12px; font-weight:600;
+    cursor:pointer; transition:all .15s; text-decoration:none;
+    font-family:var(--mono); letter-spacing:.3px;
+  }
+  .tab-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .tab-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 2px 8px rgba(59,130,246,.25); }
+
+  .filter-bar {
+    display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:10px; padding:14px 16px; margin-bottom:20px;
+  }
+  .filter-group { display:flex; flex-direction:column; gap:5px; }
+  .filter-label { font-size:10px; font-weight:700; font-family:var(--mono); text-transform:uppercase; letter-spacing:1px; color:var(--muted); }
+  .filter-bar select, .filter-bar input[type=date] {
+    padding:7px 10px; border-radius:7px; border:1px solid var(--border2);
+    background:var(--bg); color:var(--text); font-size:12px; outline:none; min-width:130px;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { border-color:var(--accent); }
+  .filter-actions { display:flex; gap:8px; align-items:flex-end; }
+
+  .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:24px; }
+  .kpi-box { background:var(--bg2); border:1px solid var(--border2); border-radius:12px; padding:18px 20px; }
+  .kpi-label { font-size:10px; font-weight:700; font-family:var(--mono); text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:6px; }
+  .kpi-value { font-size:24px; font-weight:800; color:var(--text); font-family:var(--mono); }
+  .kpi-sub { font-size:11px; color:var(--muted); margin-top:3px; }
+
+  .table-card { background:var(--bg2); border:1px solid var(--border2); border-radius:12px; overflow:hidden; }
+  .table-head { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border2); }
+  .table-title { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:1px; color:var(--muted); text-transform:uppercase; }
+  table { width:100%; border-collapse:collapse; }
+  thead th { padding:10px 14px; text-align:left; font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); background:var(--bg); border-bottom:1px solid var(--border2); }
+  tbody tr { border-bottom:1px solid var(--border2); transition:background .1s; }
+  tbody tr:last-child { border-bottom:none; }
+  tbody tr:hover { background:rgba(59,130,246,.03); }
+  tbody td { padding:12px 14px; font-size:12px; color:var(--text); vertical-align:middle; }
+  .empty-td { text-align:center; padding:50px; color:var(--muted); }
+
+  .badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); border:1px solid; }
+  .badge-green   { background:rgba(16,185,129,.1);  color:#059669; border-color:rgba(16,185,129,.25); }
+  .badge-yellow  { background:rgba(245,158,11,.1);  color:#b45309; border-color:rgba(245,158,11,.25); }
+  .badge-red     { background:rgba(239,68,68,.1);   color:#dc2626; border-color:rgba(239,68,68,.25); }
+  .badge-blue    { background:rgba(59,130,246,.1);  color:var(--accent); border-color:rgba(59,130,246,.25); }
+  .badge-gray    { background:rgba(100,116,139,.1); color:#64748b; border-color:rgba(100,116,139,.2); }
+  .badge-purple  { background:rgba(124,58,237,.1);  color:#7c3aed; border-color:rgba(124,58,237,.25); }
+
+  .action-btns { display:flex; gap:6px; }
+  .btn-sm { padding:4px 10px; font-size:11px; border-radius:6px; cursor:pointer; border:1px solid var(--border2); background:var(--bg); color:var(--text); text-decoration:none; font-family:var(--mono); transition:all .15s; }
+  .btn-sm:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-sm-del { background:rgba(239,68,68,.07); border-color:transparent; color:#dc2626; }
+  .btn-sm-del:hover { background:rgba(239,68,68,.18); }
+
+  .arquivos-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
+  .chip-arq { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; background:var(--bg); border:1px solid var(--border2); font-size:10px; color:var(--muted); text-decoration:none; }
+  .chip-arq:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* Miniaturas de fotos na tabela */
+  .foto-mini-row { display:flex; gap:4px; flex-wrap:wrap; margin-top:4px; }
+  .foto-mini { width:40px; height:40px; border-radius:6px; object-fit:cover; border:1px solid var(--border2); cursor:pointer; transition:transform .15s; }
+  .foto-mini:hover { transform:scale(1.08); border-color:var(--accent); }
+
+  /* Lightbox */
+  #lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:9999; align-items:center; justify-content:center; cursor:zoom-out; }
+  #lightbox.open { display:flex; }
+  #lightbox img { max-width:90vw; max-height:88vh; border-radius:10px; box-shadow:0 8px 60px rgba(0,0,0,.6); }
+  #lightbox-close { position:absolute; top:18px; right:24px; color:#fff; font-size:28px; cursor:pointer; line-height:1; }
+
+  .msg-ok  { background:rgba(16,185,129,.1); color:#059669; border:1px solid rgba(16,185,129,.25); padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
+  .msg-err { background:rgba(239,68,68,.1);  color:#dc2626; border:1px solid rgba(239,68,68,.25);  padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Gestão de Frota</div>
+    <div class="page-sub">Manutenções, ocorrências e histórico de custos</div>
+  </div>
+</div>
+
+{% for msg in messages %}
+  {% if msg.tags == 'success' %}<div class="msg-ok">{{ msg }}</div>{% endif %}
+  {% if msg.tags == 'error'   %}<div class="msg-err">{{ msg }}</div>{% endif %}
+{% endfor %}
+
+<!-- KPIs -->
+<div class="kpi-row">
+  <div class="kpi-box">
+    <div class="kpi-label">Custo total manutenções</div>
+    <div class="kpi-value">R$ {{ total_custo_man|floatformat:2 }}</div>
+    <div class="kpi-sub">Total registrado no sistema</div>
+  </div>
+  <div class="kpi-box">
+    <div class="kpi-label">Ocorrências em aberto</div>
+    <div class="kpi-value" style="color:{% if total_ocorrencias_abertas > 0 %}var(--red){% else %}var(--green){% endif %}">{{ total_ocorrencias_abertas }}</div>
+    <div class="kpi-sub">Aguardando resolução</div>
+  </div>
+</div>
+
+<!-- Abas -->
+<div class="tabs">
+  <a href="?aba=manutencao"  class="tab-btn {% if aba == 'manutencao'  %}active{% endif %}">🔧 Manutenções</a>
+  <a href="?aba=ocorrencias" class="tab-btn {% if aba == 'ocorrencias' %}active{% endif %}">🚨 Ocorrências</a>
+</div>
+
+<!-- ══════════════ ABA MANUTENÇÕES ══════════════ -->
+{% if aba == 'manutencao' %}
+<form method="get">
+  <input type="hidden" name="aba" value="manutencao">
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Veículo</span>
+      <select name="veiculo">
+        <option value="">Todos</option>
+        {% for v in veiculos %}<option value="{{ v.pk }}" {% if veiculo_id == v.pk|stringformat:'s' %}selected{% endif %}>{{ v.placa }}{% if v.descricao %} — {{ v.descricao|truncatechars:18 }}{% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Tipo</span>
+      <select name="tipo_man">
+        <option value="">Todos</option>
+        <option value="preventiva" {% if tipo_man == 'preventiva' %}selected{% endif %}>Preventiva</option>
+        <option value="corretiva"  {% if tipo_man == 'corretiva'  %}selected{% endif %}>Corretiva</option>
+        <option value="revisao"    {% if tipo_man == 'revisao'    %}selected{% endif %}>Revisão</option>
+        <option value="pneu"       {% if tipo_man == 'pneu'       %}selected{% endif %}>Pneu</option>
+        <option value="funilaria"  {% if tipo_man == 'funilaria'  %}selected{% endif %}>Funilaria</option>
+        <option value="eletrica"   {% if tipo_man == 'eletrica'   %}selected{% endif %}>Elétrica</option>
+        <option value="outros"     {% if tipo_man == 'outros'     %}selected{% endif %}>Outros</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Status</span>
+      <select name="status_man">
+        <option value="">Todos</option>
+        <option value="agendada"     {% if status_man == 'agendada'     %}selected{% endif %}>Agendada</option>
+        <option value="em_andamento" {% if status_man == 'em_andamento' %}selected{% endif %}>Em andamento</option>
+        <option value="concluida"    {% if status_man == 'concluida'    %}selected{% endif %}>Concluída</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">De</span>
+      <input type="date" name="data_ini" value="{{ data_ini }}">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Até</span>
+      <input type="date" name="data_fim" value="{{ data_fim }}">
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary" style="font-size:12px;padding:8px 16px;">Filtrar</button>
+      <a href="?aba=manutencao" class="btn btn-ghost" style="font-size:12px;padding:8px 14px;">Limpar</a>
+    </div>
+  </div>
+</form>
+
+<div class="table-card">
+  <div class="table-head">
+    <span class="table-title">{{ manutencoes|length }} registro(s)</span>
+    <a href="{% url 'manutencao_criar' %}" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">+ Nova manutenção</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th><th>Veículo</th><th>Tipo</th><th>Descrição</th>
+        <th>Fornecedor</th><th>Custo</th><th>KM</th><th>Status</th><th>Arquivos</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in manutencoes %}
+      <tr>
+        <td class="mono" style="font-size:11px;white-space:nowrap">{{ m.data_manutencao|date:"d/m/Y" }}</td>
+        <td>
+          <div style="font-weight:600;font-family:var(--mono)">{{ m.vehicle.placa }}</div>
+          <div style="font-size:11px;color:var(--muted)">{{ m.vehicle.descricao|truncatechars:20 }}</div>
+        </td>
+        <td>
+          {% if m.tipo == 'preventiva' %}<span class="badge badge-green">Preventiva</span>
+          {% elif m.tipo == 'corretiva' %}<span class="badge badge-red">Corretiva</span>
+          {% elif m.tipo == 'revisao' %}<span class="badge badge-blue">Revisão</span>
+          {% elif m.tipo == 'funilaria' %}<span class="badge badge-purple">Funilaria</span>
+          {% else %}<span class="badge badge-gray">{{ m.get_tipo_display }}</span>{% endif %}
+        </td>
+        <td style="max-width:200px">{{ m.descricao }}</td>
+        <td style="color:var(--muted);font-size:11px">{{ m.fornecedor|default:"—" }}</td>
+        <td class="mono" style="font-weight:600;white-space:nowrap">
+          {% if m.custo %}R$ {{ m.custo|floatformat:2 }}{% else %}<span style="color:var(--muted)">—</span>{% endif %}
+        </td>
+        <td class="mono" style="font-size:11px;color:var(--muted)">
+          {% if m.km_na_manutencao %}{{ m.km_na_manutencao|floatformat:0 }} km{% else %}—{% endif %}
+        </td>
+        <td>
+          {% if m.status == 'concluida' %}<span class="badge badge-green">Concluída</span>
+          {% elif m.status == 'em_andamento' %}<span class="badge badge-yellow">Em andamento</span>
+          {% else %}<span class="badge badge-gray">Agendada</span>{% endif %}
+        </td>
+        <td>
+          {% if m.arquivos.all %}
+          <div class="arquivos-chips">
+            {% for arq in m.arquivos.all %}
+            <a href="{{ arq.arquivo.url }}" target="_blank" class="chip-arq" title="{{ arq.nome_original }}">
+              {% if arq.eh_imagem %}🖼{% else %}📄{% endif %} {{ arq.extensao|upper }}
+            </a>
+            {% endfor %}
+          </div>
+          {% else %}<span style="color:var(--muted);font-size:11px">—</span>{% endif %}
+        </td>
+        <td>
+          <div class="action-btns">
+            <a href="{% url 'manutencao_editar' m.pk %}" class="btn-sm">Editar</a>
+            <button class="btn-sm btn-sm-del" onclick="confirmarDel('{% url 'manutencao_deletar' m.pk %}','manutenção de {{ m.vehicle.placa }}')">Excluir</button>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="10" class="empty-td">Nenhuma manutenção registrada. <a href="{% url 'manutencao_criar' %}" style="color:var(--accent)">Registrar agora →</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════ ABA OCORRÊNCIAS ══════════════ -->
+{% elif aba == 'ocorrencias' %}
+<form method="get">
+  <input type="hidden" name="aba" value="ocorrencias">
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Veículo</span>
+      <select name="veiculo">
+        <option value="">Todos</option>
+        {% for v in veiculos %}<option value="{{ v.pk }}" {% if veiculo_id == v.pk|stringformat:'s' %}selected{% endif %}>{{ v.placa }}{% if v.descricao %} — {{ v.descricao|truncatechars:18 }}{% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Tipo</span>
+      <select name="tipo_oco">
+        <option value="">Todos</option>
+        <option value="acidente"   {% if tipo_oco == 'acidente'   %}selected{% endif %}>Acidente</option>
+        <option value="multa"      {% if tipo_oco == 'multa'      %}selected{% endif %}>Multa</option>
+        <option value="furto"      {% if tipo_oco == 'furto'      %}selected{% endif %}>Furto / Roubo</option>
+        <option value="vandalismo" {% if tipo_oco == 'vandalismo' %}selected{% endif %}>Vandalismo</option>
+        <option value="avaria"     {% if tipo_oco == 'avaria'     %}selected{% endif %}>Avaria</option>
+        <option value="outros"     {% if tipo_oco == 'outros'     %}selected{% endif %}>Outros</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Gravidade</span>
+      <select name="gravidade_oco">
+        <option value="">Todas</option>
+        <option value="leve"     {% if gravidade_oco == 'leve'     %}selected{% endif %}>Leve</option>
+        <option value="moderada" {% if gravidade_oco == 'moderada' %}selected{% endif %}>Moderada</option>
+        <option value="grave"    {% if gravidade_oco == 'grave'    %}selected{% endif %}>Grave</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Status</span>
+      <select name="status_oco">
+        <option value="">Todos</option>
+        <option value="aberta"     {% if status_oco == 'aberta'     %}selected{% endif %}>Aberta</option>
+        <option value="em_analise" {% if status_oco == 'em_analise' %}selected{% endif %}>Em análise</option>
+        <option value="resolvida"  {% if status_oco == 'resolvida'  %}selected{% endif %}>Resolvida</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">De</span>
+      <input type="date" name="data_ini" value="{{ data_ini }}">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Até</span>
+      <input type="date" name="data_fim" value="{{ data_fim }}">
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary" style="font-size:12px;padding:8px 16px;">Filtrar</button>
+      <a href="?aba=ocorrencias" class="btn btn-ghost" style="font-size:12px;padding:8px 14px;">Limpar</a>
+    </div>
+  </div>
+</form>
+
+<div class="table-card">
+  <div class="table-head">
+    <span class="table-title">{{ ocorrencias|length }} registro(s)</span>
+    <a href="{% url 'ocorrencia_criar' %}" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">+ Nova ocorrência</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th><th>Veículo</th><th>Tipo</th><th>Descrição</th>
+        <th>Local</th><th>Gravidade</th><th>Custo est.</th><th>Status</th><th>Arquivos</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in ocorrencias %}
+      <tr>
+        <td class="mono" style="font-size:11px;white-space:nowrap">{{ o.data_ocorrencia|date:"d/m/Y" }}</td>
+        <td>
+          <div style="font-weight:600;font-family:var(--mono)">{{ o.vehicle.placa }}</div>
+          <div style="font-size:11px;color:var(--muted)">{{ o.vehicle.descricao|truncatechars:20 }}</div>
+        </td>
+        <td>
+          {% if o.tipo == 'acidente' %}<span class="badge badge-red">🚗 Acidente</span>
+          {% elif o.tipo == 'multa' %}<span class="badge badge-yellow">📋 Multa</span>
+          {% elif o.tipo == 'furto' %}<span class="badge badge-red">🔓 Furto</span>
+          {% elif o.tipo == 'vandalismo' %}<span class="badge badge-purple">Vandalismo</span>
+          {% else %}<span class="badge badge-gray">{{ o.get_tipo_display }}</span>{% endif %}
+        </td>
+        <td style="max-width:200px;font-size:12px">{{ o.descricao|truncatechars:60 }}</td>
+        <td style="color:var(--muted);font-size:11px">{{ o.local|default:"—" }}</td>
+        <td>
+          {% if o.gravidade == 'grave' %}<span class="badge badge-red">Grave</span>
+          {% elif o.gravidade == 'moderada' %}<span class="badge badge-yellow">Moderada</span>
+          {% else %}<span class="badge badge-green">Leve</span>{% endif %}
+        </td>
+        <td class="mono" style="font-size:11px;white-space:nowrap">
+          {% if o.custo_estimado %}R$ {{ o.custo_estimado|floatformat:2 }}{% else %}<span style="color:var(--muted)">—</span>{% endif %}
+        </td>
+        <td>
+          {% if o.status == 'resolvida' %}<span class="badge badge-green">Resolvida</span>
+          {% elif o.status == 'em_analise' %}<span class="badge badge-yellow">Em análise</span>
+          {% else %}<span class="badge badge-red">Aberta</span>{% endif %}
+        </td>
+        <td>
+          {% if o.arquivos.all %}
+            <div class="foto-mini-row">
+              {% for arq in o.arquivos.all %}
+                {% if arq.eh_imagem %}
+                <img src="{{ arq.arquivo.url }}" class="foto-mini"
+                     onclick="abrirLightbox('{{ arq.arquivo.url }}')"
+                     title="{{ arq.nome_original }}">
+                {% endif %}
+              {% endfor %}
+            </div>
+            <div class="arquivos-chips">
+              {% for arq in o.arquivos.all %}
+                {% if not arq.eh_imagem %}
+                <a href="{{ arq.arquivo.url }}" target="_blank" class="chip-arq" title="{{ arq.nome_original }}">
+                  📄 {{ arq.extensao|upper }}
+                </a>
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% else %}<span style="color:var(--muted);font-size:11px">—</span>{% endif %}
+        </td>
+        <td>
+          <div class="action-btns">
+            <a href="{% url 'ocorrencia_editar' o.pk %}" class="btn-sm">Editar</a>
+            <button class="btn-sm btn-sm-del" onclick="confirmarDel('{% url 'ocorrencia_deletar' o.pk %}','ocorrência de {{ o.vehicle.placa }}')">Excluir</button>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="10" class="empty-td">Nenhuma ocorrência registrada. <a href="{% url 'ocorrencia_criar' %}" style="color:var(--accent)">Registrar agora →</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Lightbox de fotos -->
+<div id="lightbox" onclick="fecharLightbox()">
+  <span id="lightbox-close" onclick="fecharLightbox()">✕</span>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<!-- Modal de confirmação de exclusão -->
+<div id="modal-del" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;padding:28px 32px;width:100%;max-width:380px;box-shadow:0 24px 60px rgba(0,0,0,.18);">
+    <div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:8px;">Excluir registro?</div>
+    <div id="modal-del-msg" style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.5;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="fecharDel()" class="btn btn-ghost" style="font-size:13px;padding:7px 16px;">Cancelar</button>
+      <form id="form-del" method="post" style="margin:0">{% csrf_token %}
+        <button type="submit" class="btn btn-primary" style="font-size:13px;padding:7px 16px;background:#ef4444;border-color:#ef4444;">Excluir</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function abrirLightbox(url) {
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox').classList.add('open');
+  document.addEventListener('keydown', _lbKey);
+}
+function fecharLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.removeEventListener('keydown', _lbKey);
+}
+function _lbKey(e) { if (e.key === 'Escape') fecharLightbox(); }
+
+function confirmarDel(url, desc) {
+  document.getElementById('modal-del-msg').textContent = `Tem certeza que deseja excluir ${desc}? Esta ação não pode ser desfeita.`;
+  document.getElementById('form-del').action = url;
+  const m = document.getElementById('modal-del');
+  m.style.display = 'flex';
+  m.onclick = e => { if (e.target === m) fecharDel(); };
+}
+function fecharDel() { document.getElementById('modal-del').style.display = 'none'; }
+</script>
+{% endblock %}

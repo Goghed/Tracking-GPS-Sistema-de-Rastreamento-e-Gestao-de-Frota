@@ -1,0 +1,367 @@
+{% extends 'core/base.html' %}
+{% block title %}Relatórios — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / Relatórios{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Abas */
+  .tabs { display:flex; gap:4px; margin-bottom:20px; flex-wrap:wrap; }
+  .tab-btn {
+    padding:8px 18px; border-radius:8px; border:1px solid var(--border2);
+    background:var(--bg2); color:var(--muted); font-size:12px; font-weight:600;
+    cursor:pointer; transition:all .15s; text-decoration:none;
+    font-family:var(--mono); letter-spacing:.3px;
+  }
+  .tab-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .tab-btn.active {
+    background:var(--accent); color:#fff; border-color:var(--accent);
+    box-shadow:0 2px 8px rgba(59,130,246,.25);
+  }
+
+  /* Filtros */
+  .filter-bar {
+    display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:10px; padding:14px 16px; margin-bottom:20px;
+  }
+  .filter-group { display:flex; flex-direction:column; gap:5px; }
+  .filter-label {
+    font-size:10px; font-weight:700; font-family:var(--mono);
+    text-transform:uppercase; letter-spacing:1px; color:var(--muted);
+  }
+  .filter-bar select, .filter-bar input[type=date], .filter-bar input[type=number] {
+    padding:7px 10px; border-radius:7px; border:1px solid var(--border2);
+    background:var(--bg); color:var(--text); font-size:12px;
+    outline:none; min-width:130px;
+  }
+  .filter-bar select:focus, .filter-bar input:focus {
+    border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,130,246,.1);
+  }
+  .filter-actions { display:flex; gap:8px; align-items:flex-end; }
+
+  /* Tabelas */
+  .rel-table-wrap {
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:12px; overflow:hidden;
+  }
+  .rel-table-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 18px; border-bottom:1px solid var(--border2);
+  }
+  .rel-table-title { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:1px; color:var(--muted); text-transform:uppercase; }
+  table { width:100%; border-collapse:collapse; }
+  thead th {
+    padding:10px 14px; text-align:left;
+    font-family:var(--mono); font-size:10px; font-weight:700;
+    letter-spacing:1.5px; text-transform:uppercase; color:var(--muted);
+    background:var(--bg); border-bottom:1px solid var(--border2);
+  }
+  tbody tr { border-bottom:1px solid var(--border2); }
+  tbody tr:last-child { border-bottom:none; }
+  tbody tr:hover { background:rgba(59,130,246,.03); }
+  tbody td { padding:11px 14px; font-size:12px; color:var(--text); vertical-align:middle; }
+  .empty-row td { text-align:center; padding:40px; color:var(--muted); }
+
+  .badge-danger  { background:rgba(239,68,68,.1);   color:#dc2626; border:1px solid rgba(239,68,68,.2);  padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); }
+  .badge-warning { background:rgba(245,158,11,.1);  color:#b45309; border:1px solid rgba(245,158,11,.2); padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); }
+  .badge-info    { background:rgba(59,130,246,.1);  color:var(--accent); border:1px solid rgba(59,130,246,.2);  padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); }
+  .badge-green   { background:rgba(16,185,129,.1);  color:#059669; border:1px solid rgba(16,185,129,.2); padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); }
+  .badge-red     { background:rgba(239,68,68,.1);   color:#dc2626; border:1px solid rgba(239,68,68,.2);  padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); }
+  .badge-yellow  { background:rgba(245,158,11,.1);  color:#b45309; border:1px solid rgba(245,158,11,.2); padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); }
+  .badge-gray    { background:rgba(100,116,139,.1); color:#64748b; border:1px solid rgba(100,116,139,.2);padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Relatórios</div>
+    <div class="page-sub">Análise, filtros e exportação de dados</div>
+  </div>
+</div>
+
+<!-- Abas -->
+<div class="tabs">
+  <a href="?aba=alertas"   class="tab-btn {% if aba == 'alertas' %}active{% endif %}">⚠ Alertas</a>
+  <a href="?aba=ignicao"   class="tab-btn {% if aba == 'ignicao' %}active{% endif %}">🔑 Ignições</a>
+  <a href="?aba=velocidade" class="tab-btn {% if aba == 'velocidade' %}active{% endif %}">⚡ Velocidade</a>
+  <a href="?aba=sync"      class="tab-btn {% if aba == 'sync' %}active{% endif %}">⟳ Sincronizações</a>
+</div>
+
+<!-- ════════════════════════════════ ABA: ALERTAS ════════════════════════════════ -->
+{% if aba == 'alertas' %}
+<form method="get" action="">
+  <input type="hidden" name="aba" value="alertas">
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Veículo</span>
+      <select name="veiculo">
+        <option value="">Todos</option>
+        {% for v in veiculos_lista %}
+          <option value="{{ v.pk }}" {% if veiculo_id == v.pk|stringformat:'s' %}selected{% endif %}>
+            {{ v.placa }}{% if v.descricao %} — {{ v.descricao|truncatechars:20 }}{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Severidade</span>
+      <select name="severidade">
+        <option value="">Todas</option>
+        <option value="danger"  {% if sev_filtro == 'danger'  %}selected{% endif %}>Crítico</option>
+        <option value="warning" {% if sev_filtro == 'warning' %}selected{% endif %}>Atenção</option>
+        <option value="info"    {% if sev_filtro == 'info'    %}selected{% endif %}>Informação</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">De</span>
+      <input type="date" name="data_ini" value="{{ data_ini }}">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Até</span>
+      <input type="date" name="data_fim" value="{{ data_fim }}">
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary" style="font-size:12px;padding:8px 16px;">Filtrar</button>
+      <a href="?aba=alertas" class="btn btn-ghost" style="font-size:12px;padding:8px 14px;">Limpar</a>
+    </div>
+  </div>
+</form>
+
+<div class="rel-table-wrap">
+  <div class="rel-table-head">
+    <span class="rel-table-title">{{ alertas|length }} registro(s)</span>
+    <a href="{% url 'export_alertas' %}?veiculo={{ veiculo_id }}&severidade={{ sev_filtro }}&data_ini={{ data_ini }}&data_fim={{ data_fim }}"
+       class="btn btn-ghost" style="font-size:11px;padding:5px 12px;">⬇ Exportar CSV</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Data/Hora</th><th>Veículo</th><th>Placa</th>
+        <th>Tipo</th><th>Severidade</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alertas %}
+      <tr>
+        <td class="mono" style="font-size:11px;white-space:nowrap">{{ a.ocorrido_em|date:"d/m/Y H:i" }}</td>
+        <td style="color:var(--muted)">{{ a.vehicle.descricao|truncatechars:25 }}</td>
+        <td class="mono" style="font-weight:600">{{ a.vehicle.placa }}</td>
+        <td style="max-width:260px">{{ a.tipo|truncatechars:50 }}</td>
+        <td>
+          {% if a.severidade == 'danger' %}<span class="badge-danger">Crítico</span>
+          {% elif a.severidade == 'warning' %}<span class="badge-warning">Atenção</span>
+          {% else %}<span class="badge-info">Info</span>{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr class="empty-row"><td colspan="5">Nenhum alerta encontrado com os filtros selecionados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ════════════════════════════════ ABA: IGNIÇÕES ════════════════════════════════ -->
+{% elif aba == 'ignicao' %}
+<form method="get" action="">
+  <input type="hidden" name="aba" value="ignicao">
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Veículo</span>
+      <select name="veiculo">
+        <option value="">Todos</option>
+        {% for v in veiculos_lista %}
+          <option value="{{ v.pk }}" {% if veiculo_id == v.pk|stringformat:'s' %}selected{% endif %}>
+            {{ v.placa }}{% if v.descricao %} — {{ v.descricao|truncatechars:20 }}{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Tipo</span>
+      <select name="tipo_ign">
+        <option value="">Todos</option>
+        <option value="autorizado"    {% if tipo_ign == 'autorizado'    %}selected{% endif %}>Autorizado</option>
+        <option value="nao_autorizado"{% if tipo_ign == 'nao_autorizado'%}selected{% endif %}>Não autorizado</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">De</span>
+      <input type="date" name="data_ini" value="{{ data_ini }}">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Até</span>
+      <input type="date" name="data_fim" value="{{ data_fim }}">
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary" style="font-size:12px;padding:8px 16px;">Filtrar</button>
+      <a href="?aba=ignicao" class="btn btn-ghost" style="font-size:12px;padding:8px 14px;">Limpar</a>
+    </div>
+  </div>
+</form>
+
+<div class="rel-table-wrap">
+  <div class="rel-table-head">
+    <span class="rel-table-title">{{ ignicoes|length }} registro(s)</span>
+    <a href="{% url 'export_ignicoes' %}?veiculo={{ veiculo_id }}&tipo_ign={{ tipo_ign }}&data_ini={{ data_ini }}&data_fim={{ data_fim }}"
+       class="btn btn-ghost" style="font-size:11px;padding:5px 12px;">⬇ Exportar CSV</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Data/Hora</th><th>Veículo</th><th>Placa</th>
+        <th>Dia da Semana</th><th>Tipo</th><th>Mensagem</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in ignicoes %}
+      <tr>
+        <td class="mono" style="font-size:11px;white-space:nowrap">{{ i.ocorrido_em|date:"d/m/Y H:i" }}</td>
+        <td style="color:var(--muted)">{{ i.vehicle.descricao|truncatechars:25 }}</td>
+        <td class="mono" style="font-weight:600">{{ i.vehicle.placa }}</td>
+        <td style="color:var(--muted)">{{ i.dia_semana }}</td>
+        <td>
+          {% if i.tipo == 'autorizado' %}
+            <span class="badge-green">✓ Autorizado</span>
+          {% else %}
+            <span class="badge-red">✗ Não autorizado</span>
+          {% endif %}
+        </td>
+        <td style="font-size:11px;color:var(--muted);max-width:220px">{{ i.mensagem|truncatechars:60 }}</td>
+      </tr>
+      {% empty %}
+      <tr class="empty-row"><td colspan="6">Nenhum evento de ignição encontrado.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ════════════════════════════════ ABA: VELOCIDADE ════════════════════════════════ -->
+{% elif aba == 'velocidade' %}
+<form method="get" action="">
+  <input type="hidden" name="aba" value="velocidade">
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Veículo</span>
+      <select name="veiculo">
+        <option value="">Todos</option>
+        {% for v in veiculos_lista %}
+          <option value="{{ v.pk }}" {% if veiculo_id == v.pk|stringformat:'s' %}selected{% endif %}>
+            {{ v.placa }}{% if v.descricao %} — {{ v.descricao|truncatechars:20 }}{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Velocidade mín. (km/h)</span>
+      <input type="number" name="vel_min" value="{{ vel_min }}" min="0" max="300" style="width:110px">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">De</span>
+      <input type="date" name="data_ini" value="{{ data_ini }}">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Até</span>
+      <input type="date" name="data_fim" value="{{ data_fim }}">
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary" style="font-size:12px;padding:8px 16px;">Filtrar</button>
+      <a href="?aba=velocidade" class="btn btn-ghost" style="font-size:12px;padding:8px 14px;">Limpar</a>
+    </div>
+  </div>
+</form>
+
+<div class="rel-table-wrap">
+  <div class="rel-table-head">
+    <span class="rel-table-title">{{ eventos_vel|length }} registro(s) acima de {{ vel_min }} km/h</span>
+    <a href="{% url 'export_eventos' %}" class="btn btn-ghost" style="font-size:11px;padding:5px 12px;">⬇ Exportar CSV</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Data/Hora</th><th>Veículo</th><th>Placa</th>
+        <th>Velocidade</th><th>Tipo evento</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in eventos_vel %}
+      <tr>
+        <td class="mono" style="font-size:11px;white-space:nowrap">{{ e.ocorrido_em|date:"d/m/Y H:i" }}</td>
+        <td style="color:var(--muted)">{{ e.vehicle.descricao|truncatechars:25 }}</td>
+        <td class="mono" style="font-weight:600">{{ e.vehicle.placa }}</td>
+        <td>
+          {% if e.velocidade %}
+            <span style="font-family:var(--mono);font-weight:700;
+              color:{% if e.velocidade >= 120 %}#dc2626{% elif e.velocidade >= 80 %}#b45309{% else %}var(--text){% endif %}">
+              {{ e.velocidade|floatformat:0 }} km/h
+            </span>
+          {% else %}—{% endif %}
+        </td>
+        <td style="color:var(--muted);font-size:11px">{{ e.tipo|truncatechars:40 }}</td>
+      </tr>
+      {% empty %}
+      <tr class="empty-row"><td colspan="5">Nenhum evento encontrado com os filtros selecionados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ════════════════════════════════ ABA: SYNC ════════════════════════════════ -->
+{% elif aba == 'sync' %}
+<form method="get" action="">
+  <input type="hidden" name="aba" value="sync">
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Status</span>
+      <select name="sync_status">
+        <option value="">Todos</option>
+        <option value="success" {% if sync_status == 'success' %}selected{% endif %}>Sucesso</option>
+        <option value="error"   {% if sync_status == 'error'   %}selected{% endif %}>Erro</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary" style="font-size:12px;padding:8px 16px;">Filtrar</button>
+      <a href="?aba=sync" class="btn btn-ghost" style="font-size:12px;padding:8px 14px;">Limpar</a>
+    </div>
+  </div>
+</form>
+
+<div class="rel-table-wrap">
+  <div class="rel-table-head">
+    <span class="rel-table-title">{{ syncs|length }} registro(s)</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Iniciado em</th><th>Status</th><th>Veículos</th>
+        <th>Alertas</th><th>Eventos</th><th>Duração</th><th>Erro</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in syncs %}
+      <tr>
+        <td class="mono" style="font-size:11px;white-space:nowrap">{{ s.iniciado_em|date:"d/m/Y H:i:s" }}</td>
+        <td>
+          {% if s.status == 'success' %}<span class="badge-green">✓ OK</span>
+          {% elif s.status == 'error' %}<span class="badge-red">✗ ERRO</span>
+          {% else %}<span class="badge-yellow">~ PARCIAL</span>{% endif %}
+        </td>
+        <td class="mono">{{ s.veiculos_sync }}</td>
+        <td class="mono">{{ s.alertas_sync }}</td>
+        <td class="mono">{{ s.eventos_sync }}</td>
+        <td class="mono" style="font-size:11px;color:var(--muted)">
+          {% if s.duracao_segundos %}{{ s.duracao_segundos|floatformat:1 }}s{% else %}—{% endif %}
+        </td>
+        <td style="font-size:11px;color:var(--red);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ s.erro_msg|default:"—" }}
+        </td>
+      </tr>
+      {% empty %}
+      <tr class="empty-row"><td colspan="7">Nenhuma sincronização registrada.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}

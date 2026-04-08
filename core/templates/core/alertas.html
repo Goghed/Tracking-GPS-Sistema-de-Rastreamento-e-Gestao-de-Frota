@@ -1,0 +1,104 @@
+{% extends 'core/base.html' %}
+{% block title %}Alertas — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / Alertas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Alertas</div>
+    <div class="page-sub">{{ total_nao_lidos }} não lido(s)</div>
+  </div>
+  <button class="btn btn-ghost" onclick="marcarTodos()">Marcar todos como lidos</button>
+</div>
+
+<form method="get" class="filter-row">
+  <select name="sev" class="filter-select" onchange="this.form.submit()">
+    <option value="" {% if not sev %}selected{% endif %}>Todas as severidades</option>
+    <option value="danger"  {% if sev == 'danger' %}selected{% endif %}>Crítico</option>
+    <option value="warning" {% if sev == 'warning' %}selected{% endif %}>Atenção</option>
+    <option value="info"    {% if sev == 'info' %}selected{% endif %}>Informação</option>
+  </select>
+  <select name="lido" class="filter-select" onchange="this.form.submit()">
+    <option value="" {% if lido == '' %}selected{% endif %}>Todos</option>
+    <option value="0" {% if lido == '0' %}selected{% endif %}>Não lidos</option>
+    <option value="1" {% if lido == '1' %}selected{% endif %}>Lidos</option>
+  </select>
+  <a href="{% url 'alertas' %}" class="btn btn-ghost">Limpar</a>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Data/Hora</th>
+          <th>Veículo</th>
+          <th>Placa</th>
+          <th>Tipo</th>
+          <th>Descrição</th>
+          <th>Severidade</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in alertas %}
+        <tr id="alerta-{{ a.pk }}" {% if not a.lido %}style="background:rgba(245,158,11,0.04)"{% endif %}>
+          <td><span class="dot {% if not a.lido %}dot-yellow{% else %}dot-gray{% endif %}"></span></td>
+          <td class="mono" style="font-size:11px">{{ a.ocorrido_em|date:"d/m/Y H:i" }}</td>
+          <td>{{ a.vehicle.descricao }}</td>
+          <td class="mono">{{ a.vehicle.placa }}</td>
+          <td>{{ a.tipo }}</td>
+          <td style="font-size:12px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ a.descricao|default:"—" }}
+          </td>
+          <td>
+            {% if a.severidade == 'danger' %}
+              <span class="badge badge-red">● CRÍTICO</span>
+            {% elif a.severidade == 'warning' %}
+              <span class="badge badge-yellow">● ATENÇÃO</span>
+            {% else %}
+              <span class="badge badge-blue">● INFO</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if not a.lido %}
+            <button class="btn btn-ghost" style="padding:3px 8px;font-size:9px"
+              onclick="marcarLido({{ a.pk }})">✓ LER</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:30px">Nenhum alerta encontrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// CSRF já declarado no base.html
+
+function marcarLido(pk) {
+  fetch(`/alertas/${pk}/lido/`, { method: 'POST', headers: {'X-CSRFToken': CSRF} })
+    .then(r => r.json())
+    .then(() => {
+      const row = document.getElementById('alerta-' + pk);
+      if (row) {
+        row.style.background = '';
+        const dot = row.querySelector('.dot');
+        if (dot) { dot.classList.remove('dot-yellow'); dot.classList.add('dot-gray'); }
+        const btn = row.querySelector('button');
+        if (btn) btn.remove();
+      }
+    });
+}
+
+function marcarTodos() {
+  fetch('{% url "todos_lidos" %}', { method: 'POST', headers: {'X-CSRFToken': CSRF} })
+    .then(() => location.reload());
+}
+</script>
+{% endblock %}

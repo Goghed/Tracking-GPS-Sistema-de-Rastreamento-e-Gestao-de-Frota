@@ -1,0 +1,641 @@
+{% extends 'core/base.html' %}
+{% block title %}Mapa ao Vivo — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / Mapa ao vivo{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  .content { padding: 0; height: calc(100vh - 52px); display: flex; }
+
+  /* ── Painel lateral (esquerda) ── */
+  .map-panel {
+    width: 280px;
+    min-width: 280px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+  .map-panel-head {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .map-panel-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* Botões de cidade */
+  .city-filters {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .city-btn {
+    flex: 1;
+    padding: 5px 0;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all .15s;
+    text-align: center;
+  }
+  .city-btn-all {
+    background: rgba(59,130,246,.1);
+    border-color: rgba(59,130,246,.3);
+    color: var(--accent);
+  }
+  .city-btn-all.active, .city-btn-all:hover {
+    background: rgba(59,130,246,.25);
+    border-color: var(--accent);
+  }
+  .city-btn-londrina {
+    background: rgba(239,68,68,.1);
+    border-color: rgba(239,68,68,.3);
+    color: #ef4444;
+  }
+  .city-btn-londrina.active, .city-btn-londrina:hover {
+    background: rgba(239,68,68,.25);
+    border-color: #ef4444;
+  }
+  .city-btn-itu {
+    background: rgba(245,158,11,.1);
+    border-color: rgba(245,158,11,.3);
+    color: #f59e0b;
+  }
+  .city-btn-itu.active, .city-btn-itu:hover {
+    background: rgba(245,158,11,.25);
+    border-color: #f59e0b;
+  }
+
+  /* Contador */
+  .panel-count {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .panel-count strong {
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  .map-panel-body { flex: 1; overflow-y: auto; }
+
+  .vei-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .1s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .vei-item:hover { background: var(--bg3); }
+  .vei-item-active { background: rgba(59,130,246,.08); border-left: 2px solid var(--accent); }
+  .vei-item-fora   { background: rgba(239,68,68,.05); border-left: 2px solid #ef4444; }
+  .vei-placa {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .vei-desc {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+  .vei-speed {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    text-align: right;
+  }
+  .vei-speed.moving { color: var(--green); }
+
+  /* Mapa */
+  #map { flex: 1; }
+
+  /* Mapa claro — sem filtro de escurecimento */
+  .leaflet-tile { filter: none; }
+
+  /* ── Info card fixo no mapa ── */
+  #info-card {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+    width: 240px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.6);
+    overflow: hidden;
+    display: none;
+    pointer-events: none;
+  }
+  #info-card.visible { display: block; }
+  .ic-bar {
+    height: 3px;
+    width: 100%;
+  }
+  .ic-bar-on      { background: var(--green); }
+  .ic-bar-off     { background: #475569; }
+  .ic-bar-nosignal{ background: #f59e0b; }
+  .ic-body { padding: 14px 16px; }
+  .ic-placa {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 1px;
+  }
+  .ic-nome {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    margin-bottom: 12px;
+  }
+  .ic-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .ic-row:last-child { border-bottom: none; }
+  .ic-label { color: var(--muted); font-size: 11px; }
+  .ic-val { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Painel esquerdo -->
+<div class="map-panel">
+  <div class="map-panel-head">
+    <div class="map-panel-title">Filtro por Cidade</div>
+    <div class="city-filters">
+      <button class="city-btn city-btn-all active"      onclick="filtrarCidade('todos')">TODOS</button>
+      <button class="city-btn city-btn-londrina"        onclick="filtrarCidade('londrina')">LONDRINA</button>
+      <button class="city-btn city-btn-itu"             onclick="filtrarCidade('itu')">ITU</button>
+    </div>
+    <div class="panel-count">
+      Mostrando <strong id="vei-count">—</strong> veículos
+    </div>
+  </div>
+  <div class="map-panel-body" id="vei-list">
+    <div style="padding:20px;color:var(--muted);font-size:12px;text-align:center">Carregando...</div>
+  </div>
+</div>
+
+<!-- Mapa -->
+<div id="map">
+  <!-- Info card fixo -->
+  <div id="info-card">
+    <div class="ic-bar" id="ic-bar"></div>
+    <div class="ic-body">
+      <div class="ic-placa" id="ic-placa">—</div>
+      <div class="ic-nome"  id="ic-nome">—</div>
+      <div class="ic-row">
+        <span class="ic-label">Status</span>
+        <span class="ic-val"  id="ic-status">—</span>
+      </div>
+      <div class="ic-row">
+        <span class="ic-label">Velocidade</span>
+        <span class="ic-val"  id="ic-vel">—</span>
+      </div>
+      <div class="ic-row">
+        <span class="ic-label">Última pos.</span>
+        <span class="ic-val"  id="ic-time">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const map = L.map('map').setView([-23.31, -51.17], 14);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+const markers     = {};   // id -> { marker, prevLatLng, trilha[], animFrame }
+let todosVeiculos    = [];
+let cidadeAtual      = 'todos';
+let veiculoFocado    = null;
+let primeiraRenderizacao = true; // controla o fitBounds inicial
+
+/* ── Ícones de carro SVG (vista aérea realista) ── */
+function makeCarIcon(cor, direcao, pulsar) {
+  const rot  = (direcao != null && direcao !== '') ? direcao : 0;
+  const glow = pulsar ? `filter:drop-shadow(0 0 5px ${cor}cc);` : '';
+  /* Vista de cima — frente aponta para CIMA (norte), rotação pelo campo direção */
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 64" width="28" height="44"
+       style="transform:rotate(${rot}deg);${glow}display:block;overflow:visible;">
+    <defs>
+      <filter id="sombra" x="-30%" y="-20%" width="160%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,0.35)"/>
+      </filter>
+    </defs>
+
+    <!-- carroceria principal -->
+    <path d="M7,52 Q5,56 8,58 L32,58 Q35,56 33,52 L33,18 Q33,14 30,12
+             L27,8 Q24,4 20,4 Q16,4 13,8 L10,12 Q7,14 7,18 Z"
+          fill="${cor}" filter="url(#sombra)"/>
+
+    <!-- para-brisa dianteiro -->
+    <path d="M13,16 Q13.5,10 20,10 Q26.5,10 27,16 L26,20 Q20,22 14,20 Z"
+          fill="rgba(200,230,255,0.75)" stroke="rgba(255,255,255,0.4)" stroke-width="0.5"/>
+
+    <!-- vidro traseiro -->
+    <path d="M14,50 L16,44 Q20,43 24,44 L26,50 Z"
+          fill="rgba(200,230,255,0.55)" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+
+    <!-- teto (painel central elevado) -->
+    <path d="M14,22 Q14,20 20,20 Q26,20 26,22 L26,42 Q26,44 20,44 Q14,44 14,42 Z"
+          fill="${cor}" opacity="0.6"/>
+
+    <!-- linha divisória teto -->
+    <line x1="20" y1="21" x2="20" y2="43" stroke="rgba(0,0,0,0.12)" stroke-width="0.8"/>
+
+    <!-- faróis dianteiros -->
+    <path d="M8,14 Q9,11 13,11 L13,15 Q10,15 8,14 Z" fill="#fef9c3" opacity="0.95"/>
+    <path d="M32,14 Q31,11 27,11 L27,15 Q30,15 32,14 Z" fill="#fef9c3" opacity="0.95"/>
+
+    <!-- lanternas traseiras -->
+    <path d="M8,55 Q9,58 13,58 L13,54 Q10,54 8,55 Z" fill="#fca5a5" opacity="0.9"/>
+    <path d="M32,55 Q31,58 27,58 L27,54 Q30,54 32,55 Z" fill="#fca5a5" opacity="0.9"/>
+
+    <!-- roda dianteira esquerda -->
+    <rect x="2" y="12" width="6" height="11" rx="2" fill="#1e293b"/>
+    <rect x="3" y="14" width="4" height="7"  rx="1" fill="#334155"/>
+
+    <!-- roda dianteira direita -->
+    <rect x="32" y="12" width="6" height="11" rx="2" fill="#1e293b"/>
+    <rect x="33" y="14" width="4" height="7"  rx="1" fill="#334155"/>
+
+    <!-- roda traseira esquerda -->
+    <rect x="2" y="42" width="6" height="11" rx="2" fill="#1e293b"/>
+    <rect x="3" y="44" width="4" height="7"  rx="1" fill="#334155"/>
+
+    <!-- roda traseira direita -->
+    <rect x="32" y="42" width="6" height="11" rx="2" fill="#1e293b"/>
+    <rect x="33" y="44" width="4" height="7"  rx="1" fill="#334155"/>
+  </svg>`;
+  return L.divIcon({
+    className: '',
+    html: svg,
+    iconSize:   [28, 44],
+    iconAnchor: [14, 22],
+  });
+}
+
+function _foraHorario(v) {
+  return !v.autorizado_horario && (v.ignicao === true || v.km_percorrido_hoje > 0);
+}
+
+function getIcon(v) {
+  const dir    = v.direcao;
+  const moving = v.ignicao === true && v.velocidade_atual > 0;
+  const idling = v.ignicao === true && !(v.velocidade_atual > 0);
+
+  if (_foraHorario(v)) {
+    // Laranja pulsante = fora do horário autorizado e em movimento
+    if (moving) return makeCarIcon('#f97316', dir, true);
+    return makeCarIcon('#ef4444', dir, false);
+  }
+  if (moving) return makeCarIcon('#16a34a', dir, true);
+  if (idling) return makeCarIcon('#dc2626', dir, false);
+  if (v.ignicao === false) return makeCarIcon('#dc2626', dir, false);
+  return makeCarIcon('#d97706', dir, false);
+}
+
+/* ── Cor da trilha por velocidade ── */
+function corVelocidade(vel) {
+  if (vel == null || vel <= 0)  return '#475569';  // parado - cinza
+  if (vel < 40)                 return '#22c55e';  // lento  - verde
+  if (vel < 80)                 return '#f59e0b';  // médio  - amarelo
+  return '#ef4444';                                // rápido - vermelho
+}
+
+/* ── Limites geográficos ── */
+const CIDADES = {
+  londrina: { latMin: -24.0, latMax: -22.9, lngMin: -51.6, lngMax: -50.7 },
+  itu:      { latMin: -23.5, latMax: -22.9, lngMin: -47.6, lngMax: -47.1 },
+};
+function pertenceACidade(v, cidade) {
+  if (cidade === 'todos') return true;
+  const c = CIDADES[cidade];
+  return v.latitude >= c.latMin && v.latitude <= c.latMax
+      && v.longitude >= c.lngMin && v.longitude <= c.lngMax;
+}
+
+/* ── Filtragem por cidade ── */
+function filtrarCidade(cidade) {
+  cidadeAtual = cidade;
+  primeiraRenderizacao = true; // centraliza no novo filtro
+  document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.city-btn-${cidade === 'todos' ? 'all' : cidade}`).classList.add('active');
+  renderizar();
+}
+
+/* ── Info card fixo ── */
+const card     = document.getElementById('info-card');
+const icBar    = document.getElementById('ic-bar');
+const icPlaca  = document.getElementById('ic-placa');
+const icNome   = document.getElementById('ic-nome');
+const icStatus = document.getElementById('ic-status');
+const icVel    = document.getElementById('ic-vel');
+const icTime   = document.getElementById('ic-time');
+
+function mostrarCard(v) {
+  const vel = v.velocidade_atual != null ? Math.round(v.velocidade_atual) : 0;
+  icBar.className    = 'ic-bar ' + (v.ignicao === true ? 'ic-bar-on' : v.ignicao === false ? 'ic-bar-off' : 'ic-bar-nosignal');
+  icPlaca.textContent = v.placa || '—';
+  icNome.textContent  = v.descricao || '—';
+  icVel.textContent   = vel + ' km/h';
+  icVel.style.color   = vel > 0 ? 'var(--green)' : 'var(--text)';
+  if (v.ignicao === true)       { icStatus.textContent = '● Ligado';    icStatus.style.color = 'var(--green)'; }
+  else if (v.ignicao === false) { icStatus.textContent = '■ Desligado'; icStatus.style.color = '#475569'; }
+  else                          { icStatus.textContent = '◌ Sem sinal'; icStatus.style.color = '#f59e0b'; }
+  icTime.textContent = v.ultima_posicao
+    ? new Date(v.ultima_posicao).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  card.classList.add('visible');
+}
+
+/* ── Animação suave de movimento ── */
+function animarMovimento(state, de, para, durMs) {
+  if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  const dLat = para[0] - de[0];
+  const dLng = para[1] - de[1];
+  const inicio = performance.now();
+  function step(agora) {
+    const t    = Math.min((agora - inicio) / durMs, 1);
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+    state.marker.setLatLng([de[0] + dLat * ease, de[1] + dLng * ease]);
+    if (t < 1) { state.animFrame = requestAnimationFrame(step); }
+    else        { state.animFrame = null; state.marker.setLatLng(para); }
+  }
+  state.animFrame = requestAnimationFrame(step);
+}
+
+/* ── Distância em metros entre dois pontos ── */
+function distM(a, b) {
+  const R  = 6371000;
+  const dL = (b[0]-a[0]) * Math.PI/180;
+  const dG = (b[1]-a[1]) * Math.PI/180;
+  const s  = Math.sin(dL/2)**2 + Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dG/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+/* ── Trilha colorida por velocidade ── */
+function carregarTrilha(vid) {
+  // Limpa trilhas anteriores de outros veículos
+  if (veiculoFocado && veiculoFocado !== vid && markers[veiculoFocado]) {
+    limparTrilha(veiculoFocado);
+  }
+  veiculoFocado = vid;
+
+  fetch(`/api/historico/${vid}/?horas=4`)
+    .then(r => r.json())
+    .then(data => {
+      if (!markers[vid]) return;
+      limparTrilha(vid);
+      const pontos = data.pontos;
+      if (pontos.length < 2) return;
+
+      // Desenha segmentos coloridos por velocidade
+      for (let i = 0; i < pontos.length - 1; i++) {
+        const p1 = pontos[i];
+        const p2 = pontos[i + 1];
+        const seg = L.polyline(
+          [[p1.lat, p1.lng], [p2.lat, p2.lng]],
+          { color: corVelocidade(p2.vel), weight: 4, opacity: 0.75, lineCap: 'round' }
+        ).addTo(map);
+        markers[vid].trilha.push(seg);
+      }
+
+      // Marca ponto inicial com círculo vazio
+      const inicio = L.circleMarker([pontos[0].lat, pontos[0].lng], {
+        radius: 5, color: '#64748b', fillColor: '#1a1e26', fillOpacity: 1, weight: 2
+      }).addTo(map);
+      markers[vid].trilha.push(inicio);
+    })
+    .catch(() => {});
+}
+
+function limparTrilha(vid) {
+  if (markers[vid] && markers[vid].trilha) {
+    markers[vid].trilha.forEach(l => map.removeLayer(l));
+    markers[vid].trilha = [];
+  }
+}
+
+/* ── Renderiza markers e lista ── */
+function renderizar() {
+  const filtrados = todosVeiculos.filter(v => pertenceACidade(v, cidadeAtual));
+  document.getElementById('vei-count').textContent = filtrados.length;
+
+  // Remove markers fora do filtro
+  Object.keys(markers).forEach(id => {
+    if (!filtrados.some(v => v.id == id)) {
+      limparTrilha(id);
+      map.removeLayer(markers[id].marker);
+      delete markers[id];
+    }
+  });
+
+  // Controla linhas de trajeto não autorizado (fora de horário)
+  if (!window._linhasFora) window._linhasFora = {};
+
+  let html = '';
+  filtrados.forEach(v => {
+    const vel      = v.velocidade_atual != null ? Math.round(v.velocidade_atual) : 0;
+    const velTxt   = vel + ' km/h';
+    const fora     = _foraHorario(v);
+    const corDot   = fora ? 'red' : (v.ignicao === true ? 'green' : v.ignicao === false ? 'red' : 'gray');
+    const isFocado = veiculoFocado == v.id;
+    const kmBadge  = fora && v.km_percorrido_hoje > 0
+      ? `<span style="font-family:var(--mono);font-size:9px;color:#ef4444;font-weight:700;margin-left:4px">⚠ ${v.km_percorrido_hoje.toFixed(1)}km</span>` : '';
+
+    html += `<div class="vei-item${isFocado ? ' vei-item-active' : ''}${fora ? ' vei-item-fora' : ''}" onclick="focar(${v.id})">
+      <span class="dot dot-${corDot}"></span>
+      <div style="min-width:0;flex:1">
+        <div class="vei-placa">${v.placa || '—'}${kmBadge}</div>
+        <div class="vei-desc">${v.descricao || '—'}</div>
+        ${fora ? `<div style="font-size:9px;color:#ef4444;font-family:var(--mono);margin-top:2px">FORA DO HORÁRIO</div>` : ''}
+      </div>
+      <div class="vei-speed ${vel > 0 ? 'moving' : ''}">${velTxt}</div>
+    </div>`;
+
+    // Linha laranja do trajeto não autorizado (pos_inicial → pos_atual)
+    if (fora && v.pos_inicial_lat && v.pos_inicial_lng && v.latitude && v.longitude) {
+      if (_linhasFora[v.id]) map.removeLayer(_linhasFora[v.id]);
+      _linhasFora[v.id] = L.polyline(
+        [[v.pos_inicial_lat, v.pos_inicial_lng], [v.latitude, v.longitude]],
+        { color:'#f97316', weight:3, dashArray:'8 5', opacity:.8 }
+      ).addTo(map);
+
+      // Marcador de ponto de partida
+      if (!window._marcadoresInicio) window._marcadoresInicio = {};
+      if (!_marcadoresInicio[v.id]) {
+        _marcadoresInicio[v.id] = L.circleMarker(
+          [v.pos_inicial_lat, v.pos_inicial_lng],
+          { radius:7, color:'#f97316', fillColor:'#fff', fillOpacity:1, weight:2 }
+        ).addTo(map).bindTooltip(`${v.placa} — início do trajeto`, {permanent:false});
+      }
+    } else if (!fora && _linhasFora && _linhasFora[v.id]) {
+      map.removeLayer(_linhasFora[v.id]);
+      delete _linhasFora[v.id];
+      if (_marcadoresInicio && _marcadoresInicio[v.id]) {
+        map.removeLayer(_marcadoresInicio[v.id]);
+        delete _marcadoresInicio[v.id];
+      }
+    }
+
+    const novaLatLng = [v.latitude, v.longitude];
+
+    if (markers[v.id]) {
+      const state = markers[v.id];
+      const prev  = state.prevLatLng;
+
+      // Anima se moveu mais de 5 metros (evita ruído de GPS)
+      const moveu = prev && distM(prev, novaLatLng) > 5;
+      if (moveu) {
+        animarMovimento(state, prev, novaLatLng, 1500);
+        // Adiciona segmento de trilha ao vivo para o veículo focado
+        if (veiculoFocado == v.id) {
+          const seg = L.polyline([prev, novaLatLng], {
+            color: corVelocidade(vel), weight: 4, opacity: 0.8, lineCap: 'round'
+          }).addTo(map);
+          state.trilha.push(seg);
+        }
+        state.prevLatLng = novaLatLng;
+      }
+
+      state.marker.setIcon(getIcon(v));
+      state._vData = v;
+
+    } else {
+      const mk = L.marker(novaLatLng, { icon: getIcon(v) }).addTo(map);
+      const state = { marker: mk, prevLatLng: novaLatLng, trilha: [], animFrame: null, _vData: v };
+      markers[v.id] = state;
+
+      mk.on('mouseover', () => mostrarCard(state._vData));
+      mk.on('click', () => {
+        mostrarCard(state._vData);
+        map.setView(mk.getLatLng(), 16);
+        carregarTrilha(v.id);
+      });
+    }
+  });
+
+  document.getElementById('vei-list').innerHTML = html ||
+    '<div style="padding:20px;color:var(--muted);font-size:12px;text-align:center">Nenhum veículo nesta cidade.</div>';
+
+  if (primeiraRenderizacao && filtrados.length > 0) {
+    const grupo = L.featureGroup(filtrados.map(v => markers[v.id]?.marker).filter(Boolean));
+    if (grupo.getLayers().length) map.fitBounds(grupo.getBounds().pad(0.15));
+    primeiraRenderizacao = false;
+  }
+}
+
+/* ── Focar veículo (ao clicar na lista) ── */
+function focar(id) {
+  const state = markers[id];
+  if (!state) return;
+  mostrarCard(state._vData);
+  map.setView(state.marker.getLatLng(), 16);
+  carregarTrilha(id);
+}
+
+/* ── Detecção de ignição (mesmo mecanismo do dashboard) ── */
+const _prevIgnicaoMapa = {};
+
+function _registrarEventoIgnicaoMapa(v) {
+  fetch('/api/evento-ignicao/' + v.id + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF}
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) { if (d.ok) mostrarPopupIgnicao(v, d); })
+  .catch(function() {});
+}
+
+/* ── Busca posições a cada 10s ── */
+function atualizar() {
+  return fetch('{% url "api_posicoes" %}')
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(data => {
+      const todos = data.veiculos || [];
+
+      // Detecta ignições em veículos com posição válida E nos sem posição
+      todos.forEach(function(v) {
+        const id  = v.id;
+        const ign = v.ignicao;
+        if (_prevIgnicaoMapa[id] !== true && ign === true && _prevIgnicaoMapa[id] !== undefined) {
+          _registrarEventoIgnicaoMapa(v);
+        }
+        _prevIgnicaoMapa[id] = ign;
+      });
+
+      todosVeiculos = todos.filter(v => v.latitude != null && v.longitude != null);
+      renderizar();
+      if (veiculoFocado) {
+        const v = todosVeiculos.find(v => v.id == veiculoFocado);
+        if (v) mostrarCard(v);
+      }
+    })
+    .catch(err => console.error('Erro posições:', err));
+}
+
+let _mapaFitFeito = false;
+
+function _fitMapaVeiculos() {
+  const comPos = todosVeiculos.filter(v => v.latitude && v.longitude);
+  if (comPos.length === 0 || _mapaFitFeito) return;
+  if (comPos.length === 1) {
+    map.setView([comPos[0].latitude, comPos[0].longitude], 15);
+  } else {
+    const bounds = L.latLngBounds(comPos.map(v => [v.latitude, v.longitude]));
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+  }
+  _mapaFitFeito = true;
+}
+
+// Inicializa estado anterior antes da 1ª poll (evita popup falso)
+fetch('{% url "api_posicoes" %}')
+  .then(r => r.json())
+  .then(data => {
+    (data.veiculos || []).forEach(v => { _prevIgnicaoMapa[v.id] = v.ignicao; });
+  })
+  .catch(() => {})
+  .finally(() => {
+    atualizar().then(_fitMapaVeiculos);
+    setInterval(atualizar, 10000);
+  });
+</script>
+{% endblock %}

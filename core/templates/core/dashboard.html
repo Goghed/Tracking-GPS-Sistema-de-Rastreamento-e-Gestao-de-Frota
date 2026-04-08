@@ -1,0 +1,872 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Dashboard — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  canvas { max-height: 200px; }
+
+  /* ── Fleet grid ── */
+  .fleet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+  }
+
+  .vcard {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color .2s, transform .2s, box-shadow .2s;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .vcard:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.1); }
+
+  /* tarja colorida no topo por status */
+  .vcard::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    z-index: 2;
+  }
+  .vcard-on::before  { background: linear-gradient(90deg, var(--green), #34d399); }
+  .vcard-off::before { background: var(--border2); }
+  .vcard-nosignal::before { background: linear-gradient(90deg, var(--yellow), #fbbf24); }
+  .vcard-fora::before { background: linear-gradient(90deg, #ef4444, #f97316); }
+
+  .vcard-on:hover    { border-color: rgba(16,185,129,.4); box-shadow: 0 8px 24px rgba(16,185,129,.08); }
+  .vcard-off:hover   { border-color: var(--border2); }
+  .vcard-nosignal:hover { border-color: rgba(245,158,11,.4); box-shadow: 0 8px 24px rgba(245,158,11,.08); }
+  .vcard-fora { border-color: rgba(239,68,68,.35) !important; box-shadow: 0 4px 20px rgba(239,68,68,.12); }
+  .vcard-fora:hover  { border-color: rgba(239,68,68,.6) !important; box-shadow: 0 8px 28px rgba(239,68,68,.18); }
+
+  /* Painel de alerta dentro do card (fora de horário) */
+  .vcard-fora-panel {
+    margin: 6px 12px 10px;
+    padding: 8px 10px;
+    background: rgba(239,68,68,.07);
+    border: 1px solid rgba(239,68,68,.2);
+    border-radius: 8px;
+    font-size: 11px;
+  }
+  .vcard-fora-title {
+    font-family: var(--mono); font-weight: 700; font-size: 9px;
+    letter-spacing: 1px; text-transform: uppercase;
+    color: #dc2626; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .vcard-fora-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .vcard-fora-label { color: #94a3b8; font-size: 10px; }
+  .vcard-fora-val   { font-family: var(--mono); font-size: 10px; color: #0f172a; font-weight: 600; }
+  .vcard-fora-km    { font-family: var(--mono); font-size: 13px; font-weight: 800; color: #dc2626; }
+  .vcard-fora-link  { font-size: 10px; color: var(--accent); text-decoration: none; font-family: var(--mono); }
+  .vcard-fora-link:hover { text-decoration: underline; }
+
+  /* Foto / placeholder */
+  .vcard-img {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    display: block;
+    background: var(--bg3);
+  }
+  .vcard-img-placeholder {
+    width: 100%;
+    height: 100px;
+    background: linear-gradient(135deg, #f0f4f8 0%, #e8eef4 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .vcard-img-placeholder svg { width: 64px; height: 64px; opacity: .35; }
+
+  /* Ícone de ignição sobreposto à foto */
+  .vcard-ign-dot {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    border: 2px solid var(--bg2);
+    z-index: 3;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  }
+  .vcard-ign-dot-on  { background: var(--green); box-shadow: 0 0 8px rgba(16,185,129,.6); animation: pulse 2s infinite; }
+  .vcard-ign-dot-off { background: #94a3b8; }
+
+  /* Botão de upload de foto no card */
+  .vcard-foto-upload {
+    position: absolute; bottom: 7px; left: 7px; z-index: 4;
+    background: rgba(15,23,42,.65); color: #fff;
+    border: none; border-radius: 6px; padding: 4px 8px;
+    font-size: 10px; font-family: var(--mono); cursor: pointer;
+    opacity: 0; transition: opacity .2s;
+    backdrop-filter: blur(4px);
+  }
+  .vcard:hover .vcard-foto-upload { opacity: 1; }
+  .vcard-foto-input { display: none; }
+  .vcard-ign-dot-ns  { background: var(--yellow); }
+
+  /* Corpo do card */
+  .vcard-body { padding: 10px 12px 12px; }
+
+  .vcard-placa {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 1px;
+  }
+  .vcard-nome {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Linha de stats */
+  .vcard-stats {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    gap: 6px;
+  }
+  .vcard-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 20px;
+    letter-spacing: .5px;
+    white-space: nowrap;
+  }
+  .vcard-badge-on  { background: rgba(16,185,129,.12); color: #059669; border: 1px solid rgba(16,185,129,.25); }
+  .vcard-badge-off { background: rgba(100,116,139,.1);  color: #64748b; border: 1px solid rgba(100,116,139,.2); }
+  .vcard-badge-ns  { background: rgba(245,158,11,.12);  color: #b45309; border: 1px solid rgba(245,158,11,.25); }
+
+  .vcard-speed {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .vcard-speed.moving { color: var(--green); }
+  .vcard-speed small { font-size: 9px; color: var(--muted); font-weight: 400; }
+
+  /* Seta de direção + hora */
+  .vcard-dir {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .vcard-dir svg { flex-shrink: 0; }
+  .vcard-time {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-left: auto;
+  }
+
+  /* ── KM rodado ── */
+  .vcard-km {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 1px solid var(--border);
+    cursor: default;
+  }
+  .km-icon { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .km-display {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    cursor: pointer;
+    padding: 1px 4px;
+    border-radius: 4px;
+    transition: background .15s;
+    line-height: 1.4;
+  }
+  .km-display:hover { background: rgba(59,130,246,.08); color: var(--accent); }
+  .km-display small { font-size: 9px; color: var(--muted); font-weight: 400; }
+  .km-hoje {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--green);
+    font-weight: 700;
+    background: rgba(16,185,129,.1);
+    padding: 1px 5px;
+    border-radius: 20px;
+  }
+  .km-input {
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 80px;
+    padding: 2px 5px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--bg2);
+    color: var(--text);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+  }
+
+  /* ── Filtro de cidade (dashboard) ── */
+  .dash-city-filters { display:flex; gap:6px; }
+  .dash-city-btn {
+    padding:4px 12px; border-radius:6px; border:1px solid;
+    font-family:var(--mono); font-size:10px; font-weight:700;
+    letter-spacing:.5px; cursor:pointer; transition:all .15s;
+  }
+  .dash-city-btn-all      { background:rgba(59,130,246,.08); border-color:rgba(59,130,246,.3); color:var(--accent); }
+  .dash-city-btn-all.active, .dash-city-btn-all:hover      { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .dash-city-btn-londrina { background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.3); color:#ef4444; }
+  .dash-city-btn-londrina.active, .dash-city-btn-londrina:hover { background:#ef4444; border-color:#ef4444; color:#fff; }
+  .dash-city-btn-itu      { background:rgba(245,158,11,.08); border-color:rgba(245,158,11,.3); color:#f59e0b; }
+  .dash-city-btn-itu.active, .dash-city-btn-itu:hover      { background:#f59e0b; border-color:#f59e0b; color:#fff; }
+  .fleet-grid .vcard-hidden { display:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub" id="sync-status-txt">
+      Última sync:
+      {% if ultimo_sync %}
+        {{ ultimo_sync.iniciado_em|date:"d/m/Y H:i:s" }}
+        — <span style="color:{% if ultimo_sync.status == 'success' %}var(--green){% else %}var(--red){% endif %}">{{ ultimo_sync.get_status_display }}</span>
+      {% else %}
+        Nenhuma sync ainda
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-grid">
+  <div class="kpi" style="--kpi-color: var(--accent)">
+    <span class="kpi-icon">◈</span>
+    <div class="kpi-value">{{ total_veiculos }}</div>
+    <div class="kpi-label">Total de Veículos</div>
+  </div>
+  <div class="kpi" style="--kpi-color: var(--green)">
+    <span class="kpi-icon">▲</span>
+    <div class="kpi-value">{{ ligados }}</div>
+    <div class="kpi-label">Ligados</div>
+  </div>
+  <div class="kpi" style="--kpi-color: var(--red)">
+    <span class="kpi-icon">■</span>
+    <div class="kpi-value">{{ desligados }}</div>
+    <div class="kpi-label">Desligados</div>
+  </div>
+  <div class="kpi" style="--kpi-color: var(--muted)">
+    <span class="kpi-icon">?</span>
+    <div class="kpi-value">{{ sem_sinal }}</div>
+    <div class="kpi-label">Sem sinal</div>
+  </div>
+  <div class="kpi" style="--kpi-color: var(--yellow)">
+    <span class="kpi-icon">⚠</span>
+    <div class="kpi-value">{{ alertas_hoje }}</div>
+    <div class="kpi-label">Alertas (24h)</div>
+  </div>
+  <div class="kpi" style="--kpi-color: var(--red)">
+    <span class="kpi-icon">!</span>
+    <div class="kpi-value">{{ alertas_nao_lidos }}</div>
+    <div class="kpi-label">Não lidos</div>
+  </div>
+  <div class="kpi" style="--kpi-color: var(--red)">
+    <span class="kpi-icon">⛔</span>
+    <div class="kpi-value">{{ nao_autorizados_hoje }}</div>
+    <div class="kpi-label">Ignições n/auth (24h)</div>
+  </div>
+</div>
+
+<!-- Gráficos -->
+<div class="grid-2" style="margin-bottom:24px">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Alertas por Hora (24h)</div>
+    </div>
+    <canvas id="chart-alertas"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Eventos por Dia (7 dias)</div>
+    </div>
+    <canvas id="chart-eventos"></canvas>
+  </div>
+</div>
+
+<!-- Cards de Veículos -->
+<div class="card" style="margin-bottom:24px">
+  <div class="card-header">
+    <div class="card-title">Frota — Status em Tempo Real</div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <div class="dash-city-filters">
+        <button class="dash-city-btn dash-city-btn-all active"      onclick="filtrarCidadeDash('todos')">TODOS</button>
+        <button class="dash-city-btn dash-city-btn-londrina"        onclick="filtrarCidadeDash('londrina')">LONDRINA</button>
+        <button class="dash-city-btn dash-city-btn-itu"             onclick="filtrarCidadeDash('itu')">ITU</button>
+      </div>
+      <span id="dash-vei-count" style="font-family:var(--mono);font-size:10px;color:var(--muted)">{{ total_veiculos }} veículos</span>
+    </div>
+  </div>
+  <div class="fleet-grid">
+    {% for v in veiculos_cards %}
+    <a href="{% url 'veiculo_detalhe' v.pk %}"
+       class="vcard {% if v.ignicao %}vcard-on{% elif v.ignicao is False %}vcard-off{% else %}vcard-nosignal{% endif %}"
+       data-vid="{{ v.pk }}"
+       data-lat="{{ v.latitude|default:'' }}"
+       data-lng="{{ v.longitude|default:'' }}"
+       title="{{ v.descricao }}">
+
+      <!-- Foto ou placeholder -->
+      <div style="position:relative">
+        {% if v.foto %}
+          <img class="vcard-img" src="{{ v.foto.url }}" alt="{{ v.placa }}">
+        {% else %}
+          <div class="vcard-img-placeholder">
+            {% if v.tipo == "2" %}
+            <!-- Moto -->
+            <svg viewBox="0 0 64 40" fill="none"><ellipse cx="13" cy="30" rx="9" ry="9" stroke="#475569" stroke-width="2"/><ellipse cx="51" cy="30" rx="9" ry="9" stroke="#475569" stroke-width="2"/><path d="M22 30 L30 16 L40 16 L48 30" stroke="#475569" stroke-width="2" fill="none"/><path d="M30 16 L34 10 L44 10 L44 16" stroke="#475569" stroke-width="1.5" fill="none"/><circle cx="13" cy="30" r="4" fill="#334155"/><circle cx="51" cy="30" r="4" fill="#334155"/></svg>
+            {% elif v.tipo == "7" %}
+            <!-- Caminhão/especial -->
+            <svg viewBox="0 0 64 40" fill="none"><rect x="4" y="12" width="36" height="20" rx="2" stroke="#475569" stroke-width="2"/><rect x="40" y="18" width="18" height="14" rx="2" stroke="#475569" stroke-width="2"/><circle cx="14" cy="33" r="5" stroke="#475569" stroke-width="2"/><circle cx="48" cy="33" r="5" stroke="#475569" stroke-width="2"/><circle cx="14" cy="33" r="2" fill="#334155"/><circle cx="48" cy="33" r="2" fill="#334155"/><rect x="42" y="20" width="14" height="8" rx="1" fill="#334155" opacity=".4"/></svg>
+            {% else %}
+            <!-- Carro padrão -->
+            <svg viewBox="0 0 64 40" fill="none"><rect x="4" y="20" width="56" height="14" rx="3" stroke="#475569" stroke-width="2"/><path d="M12 20 L18 10 H46 L52 20 Z" stroke="#475569" stroke-width="2" fill="none"/><path d="M20 19 L24 12 H40 L44 19 Z" fill="#334155" opacity=".5"/><circle cx="16" cy="35" r="5" stroke="#475569" stroke-width="2"/><circle cx="48" cy="35" r="5" stroke="#475569" stroke-width="2"/><circle cx="16" cy="35" r="2" fill="#334155"/><circle cx="48" cy="35" r="2" fill="#334155"/><rect x="4" y="23" width="5" height="3" rx="1" fill="#475569" opacity=".7"/><rect x="55" y="23" width="5" height="3" rx="1" fill="#475569" opacity=".7"/></svg>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        <!-- Dot de status sobreposto -->
+        <span class="vcard-ign-dot {% if v.ignicao %}vcard-ign-dot-on{% elif v.ignicao is False %}vcard-ign-dot-off{% else %}vcard-ign-dot-ns{% endif %}"
+              data-dot="{{ v.pk }}"></span>
+
+        <!-- Upload de foto -->
+        <button class="vcard-foto-upload" type="button"
+                onclick="event.preventDefault();event.stopPropagation();document.getElementById('foto-input-{{ v.pk }}').click()">
+          📷 foto
+        </button>
+        <input class="vcard-foto-input" type="file" id="foto-input-{{ v.pk }}"
+               accept="image/*" data-vid="{{ v.pk }}"
+               onchange="uploadFoto(this)">
+      </div>
+
+      <!-- Corpo -->
+      <div class="vcard-body">
+        <div class="vcard-placa">{{ v.placa|default:"—" }}</div>
+        <div class="vcard-nome">{{ v.descricao|truncatechars:20 }}</div>
+
+        <div class="vcard-stats">
+          <span class="vcard-badge {% if v.ignicao %}vcard-badge-on{% elif v.ignicao is False %}vcard-badge-off{% else %}vcard-badge-ns{% endif %}"
+                data-badge="{{ v.pk }}">
+            {% if v.ignicao %}● LIGADO{% elif v.ignicao is False %}■ DESLIG.{% else %}◌ S.SINAL{% endif %}
+          </span>
+          <span class="vcard-speed {% if v.velocidade_atual and v.velocidade_atual > 0 %}moving{% endif %}"
+                data-speed="{{ v.pk }}">
+            {{ v.velocidade_atual|default:0|floatformat:0 }}<small> km/h</small>
+          </span>
+        </div>
+
+        <!-- Direção + última comunicação -->
+        <div class="vcard-dir">
+          {% if v.direcao is not None %}
+          <svg width="14" height="14" viewBox="0 0 20 20"
+               style="transform:rotate({{ v.direcao|floatformat:0 }}deg);opacity:.5;flex-shrink:0"
+               data-dir="{{ v.pk }}">
+            <path d="M10 2 L14 16 L10 13 L6 16 Z" fill="var(--muted)"/>
+          </svg>
+          {% endif %}
+          <span class="vcard-time" data-time="{{ v.pk }}">
+            {% if v.ultima_posicao %}{{ v.ultima_posicao|date:"d/m H:i" }}{% else %}sem dados{% endif %}
+          </span>
+        </div>
+
+        <!-- KM rodado -->
+        <div class="vcard-km" onclick="event.preventDefault();event.stopPropagation()">
+          <span class="km-icon">⊙</span>
+          <span class="km-display"
+                data-km-display="{{ v.pk }}"
+                data-km-value="{% if v.km_base is not None %}{{ v.km_base|floatformat:0 }}{% endif %}"
+                onclick="editarKm(event, {{ v.pk }})">
+            {% if v.km_base is not None %}
+              {{ v.km_base|floatformat:0 }}<small> km</small>
+            {% else %}
+              —<small> km</small>
+            {% endif %}
+          </span>
+          <span class="km-hoje" data-km-hoje="{{ v.pk }}"
+                {% if not v.km_percorrido_hoje %}style="display:none"{% endif %}>
+            {% if v.km_percorrido_hoje %}+{{ v.km_percorrido_hoje|floatformat:1 }}{% endif %}
+          </span>
+        </div>
+      </div>
+    </a>
+    {% empty %}
+    <p style="color:var(--muted);grid-column:1/-1;text-align:center;padding:30px">Nenhum veículo sincronizado ainda.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Alertas recentes -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">Alertas Recentes</div>
+    <a href="{% url 'alertas' %}" class="btn btn-ghost" style="font-size:10px;padding:5px 10px">Ver todos →</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Data/Hora</th>
+          <th>Veículo</th>
+          <th>Placa</th>
+          <th>Tipo</th>
+          <th>Severidade</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alerta in alertas_recentes %}
+        <tr>
+          <td class="mono">{{ alerta.ocorrido_em|date:"d/m/Y H:i" }}</td>
+          <td>{{ alerta.vehicle.descricao }}</td>
+          <td class="mono">{{ alerta.vehicle.placa }}</td>
+          <td>{{ alerta.tipo }}</td>
+          <td>
+            {% if alerta.severidade == 'danger' %}
+              <span class="badge badge-red">● CRÍTICO</span>
+            {% elif alerta.severidade == 'warning' %}
+              <span class="badge badge-yellow">● ATENÇÃO</span>
+            {% else %}
+              <span class="badge badge-blue">● INFO</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:30px">Nenhum alerta registrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Eventos de Ignição (24h) -->
+<div class="card" style="margin-top:24px">
+  <div class="card-header">
+    <div class="card-title">
+      Eventos de Ignição (24h)
+      {% if nao_autorizados_hoje %}
+      <span class="ign-nao-auth-badge" style="margin-left:8px">⚠ {{ nao_autorizados_hoje }} não autorizado{{ nao_autorizados_hoje|pluralize }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Data/Hora</th>
+          <th>Veículo</th>
+          <th>Placa</th>
+          <th>Dia</th>
+          <th>Status</th>
+          <th>Mensagem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in eventos_ignicao %}
+        <tr>
+          <td class="mono" style="font-size:11px">{{ ev.ocorrido_em|date:"d/m/Y H:i" }}</td>
+          <td>{{ ev.vehicle.descricao|truncatechars:22 }}</td>
+          <td class="mono">{{ ev.vehicle.placa }}</td>
+          <td style="font-size:12px">{{ ev.dia_semana }}</td>
+          <td>
+            {% if ev.tipo == 'nao_autorizado' %}
+              <span class="badge badge-red">⚠ NÃO AUTORIZADO</span>
+            {% else %}
+              <span class="badge badge-green">✓ AUTORIZADO</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;color:var(--muted);max-width:260px">{{ ev.mensagem|truncatechars:60 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:30px">Nenhuma ignição registrada nas últimas 24h.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const alertasData = {{ alertas_por_hora|safe }};
+const eventosData = {{ eventos_semana|safe }};
+
+/* ── Estado anterior de ignição (inicializado do servidor) ── */
+const _prevIgnicao = {
+  {% for v in veiculos_cards %}
+  {{ v.pk }}: {% if v.ignicao %}true{% elif v.ignicao is False %}false{% else %}null{% endif %}{% if not forloop.last %},{% endif %}
+  {% endfor %}
+};
+
+function _registrarEventoIgnicao(v) {
+  fetch('/api/evento-ignicao/' + v.id + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF}
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) mostrarPopupIgnicao(v, d);
+  })
+  .catch(function() {});
+}
+
+/* ── Atualização em tempo real dos cards de veículos ─────── */
+function atualizarCards() {
+  fetch('{% url "api_posicoes" %}')
+    .then(r => r.json())
+    .then(data => {
+      data.veiculos.forEach(v => {
+        const id  = v.id;
+        const vel = Math.round(v.velocidade_atual || 0);
+        const ign = v.ignicao;  // true | false | null
+
+        /* Detecta veículo recém-ligado (mudou de não-ligado para ligado) */
+        if (_prevIgnicao[id] !== true && ign === true && _prevIgnicao[id] !== undefined) {
+          _registrarEventoIgnicao(v);
+        }
+        _prevIgnicao[id] = ign;
+
+        // Velocidade
+        const speedEl = document.querySelector(`[data-speed="${id}"]`);
+        if (speedEl) {
+          speedEl.innerHTML = `${vel}<small> km/h</small>`;
+          speedEl.classList.toggle('moving', vel > 0);
+        }
+
+        // Badge de status
+        const badgeEl = document.querySelector(`[data-badge="${id}"]`);
+        if (badgeEl) {
+          if (ign === true) {
+            badgeEl.className = 'vcard-badge vcard-badge-on';
+            badgeEl.textContent = '● LIGADO';
+          } else if (ign === false) {
+            badgeEl.className = 'vcard-badge vcard-badge-off';
+            badgeEl.textContent = '■ DESLIG.';
+          } else {
+            badgeEl.className = 'vcard-badge vcard-badge-ns';
+            badgeEl.textContent = '◌ S.SINAL';
+          }
+        }
+
+        // Dot no canto da foto
+        const dotEl = document.querySelector(`[data-dot="${id}"]`);
+        if (dotEl) {
+          dotEl.className = 'vcard-ign-dot ' + (
+            ign === true  ? 'vcard-ign-dot-on'  :
+            ign === false ? 'vcard-ign-dot-off' : 'vcard-ign-dot-ns'
+          );
+        }
+
+        // Fora de horário: ligado (ou rodou KM hoje) fora de Seg-Sex 08-18
+        const foraHorario = !v.autorizado_horario && (ign === true || (v.km_percorrido_hoje > 0));
+
+        // Borda / classe do card + atualiza lat/lng para filtro de cidade
+        const card = document.querySelector(`[data-vid="${id}"]`);
+        if (card) {
+          card.classList.remove('vcard-on', 'vcard-off', 'vcard-nosignal', 'vcard-fora');
+          if (foraHorario) {
+            card.classList.add('vcard-fora');
+          } else {
+            card.classList.add(ign === true ? 'vcard-on' : ign === false ? 'vcard-off' : 'vcard-nosignal');
+          }
+          if (v.latitude  != null) card.dataset.lat = v.latitude;
+          if (v.longitude != null) card.dataset.lng = v.longitude;
+        }
+
+        // Painel de alerta fora de horário
+        let painelEl = document.querySelector(`[data-fora-panel="${id}"]`);
+        if (foraHorario && v.km_percorrido_hoje > 0) {
+          const fmtCoord = (lat, lng) => lat && lng ? `${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}` : '—';
+          const iniStr = fmtCoord(v.pos_inicial_lat, v.pos_inicial_lng);
+          const atualStr = fmtCoord(v.latitude, v.longitude);
+          const mapsLink = (v.pos_inicial_lat && v.pos_inicial_lng && v.latitude && v.longitude)
+            ? `https://maps.google.com/maps/dir/${v.pos_inicial_lat},${v.pos_inicial_lng}/${v.latitude},${v.longitude}`
+            : null;
+
+          const html = `
+            <div class="vcard-fora-title">⚠ Uso fora do horário</div>
+            <div class="vcard-fora-row">
+              <span class="vcard-fora-label">KM rodado</span>
+              <span class="vcard-fora-km">${v.km_percorrido_hoje.toFixed(1)} km</span>
+            </div>
+            <div class="vcard-fora-row">
+              <span class="vcard-fora-label">Início</span>
+              <span class="vcard-fora-val">${iniStr}</span>
+            </div>
+            <div class="vcard-fora-row">
+              <span class="vcard-fora-label">Atual</span>
+              <span class="vcard-fora-val">${atualStr}</span>
+            </div>
+            ${mapsLink ? `<a href="${mapsLink}" target="_blank" rel="noopener" class="vcard-fora-link">Ver trajeto no Google Maps →</a>` : ''}`;
+
+          if (!painelEl) {
+            painelEl = document.createElement('div');
+            painelEl.className = 'vcard-fora-panel';
+            painelEl.setAttribute('data-fora-panel', id);
+            // Insere após o vcard-body
+            const body = card.querySelector('.vcard-body');
+            if (body) body.insertAdjacentElement('afterend', painelEl);
+            else card.appendChild(painelEl);
+          }
+          painelEl.innerHTML = html;
+        } else if (painelEl) {
+          painelEl.remove();
+        }
+
+        // Hora
+        const timeEl = document.querySelector(`[data-time="${id}"]`);
+        if (timeEl && v.ultima_posicao) {
+          const d = new Date(v.ultima_posicao);
+          const fmt = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})
+                    + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+          timeEl.textContent = fmt;
+        }
+
+        // KM hoje
+        const kmHojeEl = document.querySelector(`[data-km-hoje="${id}"]`);
+        if (kmHojeEl) {
+          if (v.km_percorrido_hoje > 0) {
+            kmHojeEl.textContent = `+${v.km_percorrido_hoje.toFixed(1)}`;
+            kmHojeEl.style.display = '';
+          } else {
+            kmHojeEl.style.display = 'none';
+          }
+        }
+      });
+      // Reaplicar filtro de cidade após atualizar os cards
+      if (_cidadeDash !== 'todos') _aplicarFiltroCidadeDash();
+    })
+    .catch(() => {});
+}
+
+/* ── Filtro de cidade no dashboard ── */
+const _CIDADES_DASH = {
+  londrina: { latMin:-24.0, latMax:-22.9, lngMin:-51.6, lngMax:-50.7 },
+  itu:      { latMin:-23.5, latMax:-22.9, lngMin:-47.6, lngMax:-47.1 },
+};
+let _cidadeDash = 'todos';
+
+function filtrarCidadeDash(cidade) {
+  _cidadeDash = cidade;
+  document.querySelectorAll('.dash-city-btn').forEach(b => b.classList.remove('active'));
+  const mapa = { todos:'all', londrina:'londrina', itu:'itu' };
+  document.querySelector(`.dash-city-btn-${mapa[cidade]}`).classList.add('active');
+  _aplicarFiltroCidadeDash();
+}
+
+function _pertenceACidadeDash(lat, lng, cidade) {
+  if (cidade === 'todos' || !lat || !lng) return cidade === 'todos';
+  const c = _CIDADES_DASH[cidade];
+  return lat >= c.latMin && lat <= c.latMax && lng >= c.lngMin && lng <= c.lngMax;
+}
+
+function _aplicarFiltroCidadeDash() {
+  const cards = document.querySelectorAll('.fleet-grid .vcard');
+  let visivel = 0;
+  cards.forEach(card => {
+    const lat = parseFloat(card.dataset.lat);
+    const lng = parseFloat(card.dataset.lng);
+    const show = _pertenceACidadeDash(lat, lng, _cidadeDash);
+    card.style.display = show ? '' : 'none';
+    if (show) visivel++;
+  });
+  const countEl = document.getElementById('dash-vei-count');
+  if (countEl) countEl.textContent = visivel + ' veículo' + (visivel !== 1 ? 's' : '');
+}
+
+function atualizarStatusSync() {
+  fetch('{% url "api_ultimo_sync" %}')
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      const cor = d.status === 'success' ? 'var(--green)' : 'var(--red)';
+      document.getElementById('sync-status-txt').innerHTML =
+        `Última sync: ${d.data} — <span style="color:${cor}">${d.status_display}</span>`;
+    })
+    .catch(() => {});
+}
+
+// Atualiza cards e status de sync a cada 5 segundos
+setInterval(atualizarCards, 5000);
+setInterval(atualizarStatusSync, 5000);
+
+/* ── Edição inline de KM base ── */
+function editarKm(event, vid) {
+  event.preventDefault();
+  event.stopPropagation();
+  const display = document.querySelector(`[data-km-display="${vid}"]`);
+  if (!display) return;
+
+  const currentKm = display.dataset.kmValue || '';
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'km-input';
+  input.value = currentKm;
+  input.placeholder = 'Ex: 45000';
+  input.min = '0';
+  display.replaceWith(input);
+  input.focus();
+  if (currentKm) input.select();
+
+  function restaurar(novoKm, novoValor) {
+    const span = document.createElement('span');
+    span.className = 'km-display';
+    span.dataset.kmDisplay = vid;
+    span.dataset.kmValue = novoKm !== null ? novoKm : currentKm;
+    span.setAttribute('onclick', `editarKm(event, ${vid})`);
+    if (novoKm !== null) {
+      span.innerHTML = `${Number(novoKm).toLocaleString('pt-BR')}<small> km</small>`;
+    } else {
+      span.innerHTML = currentKm ? `${Number(currentKm).toLocaleString('pt-BR')}<small> km</small>` : `—<small> km</small>`;
+    }
+    input.replaceWith(span);
+  }
+
+  function salvar() {
+    const km = parseFloat(input.value);
+    if (!isNaN(km) && km >= 0) {
+      fetch(`/api/km-base/${vid}/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `km=${km}`
+      })
+      .then(r => r.json())
+      .then(d => { restaurar(d.ok ? km : null, d.ok ? km : null); })
+      .catch(() => restaurar(null, null));
+    } else {
+      restaurar(null, null);
+    }
+  }
+
+  input.addEventListener('blur', salvar);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = currentKm; input.blur(); }
+  });
+  input.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+}
+
+const chartDefaults = {
+  plugins: { legend: { display: false } },
+  scales: {
+    x: {
+      grid: { color: 'rgba(0,0,0,0.04)' },
+      ticks: { color: '#64748b', font: { family: 'Space Mono', size: 9 } }
+    },
+    y: {
+      grid: { color: 'rgba(0,0,0,0.04)' },
+      ticks: { color: '#64748b', font: { family: 'Space Mono', size: 9 }, stepSize: 1 },
+      beginAtZero: true
+    }
+  }
+};
+
+new Chart(document.getElementById('chart-alertas'), {
+  type: 'bar',
+  data: {
+    labels: alertasData.map(d => d.hora),
+    datasets: [{
+      data: alertasData.map(d => d.count),
+      backgroundColor: 'rgba(245,158,11,0.3)',
+      borderColor: '#f59e0b',
+      borderWidth: 1,
+      borderRadius: 2,
+    }]
+  },
+  options: { ...chartDefaults, responsive: true }
+});
+
+new Chart(document.getElementById('chart-eventos'), {
+  type: 'line',
+  data: {
+    labels: eventosData.map(d => d.dia),
+    datasets: [{
+      data: eventosData.map(d => d.count),
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.1)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.3,
+      pointBackgroundColor: '#3b82f6',
+      pointRadius: 3,
+    }]
+  },
+  options: { ...chartDefaults, responsive: true }
+});
+
+/* ── Upload de foto do veículo ── */
+function uploadFoto(input) {
+  const vid  = input.dataset.vid;
+  const file = input.files[0];
+  if (!file) return;
+
+  const form = new FormData();
+  form.append('foto', file);
+
+  // Prévia imediata
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const card = document.querySelector(`[data-vid="${vid}"]`);
+    if (!card) return;
+    const wrap = card.querySelector('[style="position:relative"]') || card.querySelector('div');
+    // Troca placeholder por <img> ou atualiza src existente
+    let img = card.querySelector('.vcard-img');
+    if (!img) {
+      const placeholder = card.querySelector('.vcard-img-placeholder');
+      if (placeholder) {
+        img = document.createElement('img');
+        img.className = 'vcard-img';
+        img.alt = '';
+        placeholder.replaceWith(img);
+      }
+    }
+    if (img) img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+
+  fetch(`/api/foto/${vid}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF },
+    body: form,
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok) alert('Erro ao salvar foto: ' + (d.erro || ''));
+  })
+  .catch(() => alert('Erro ao enviar foto.'));
+
+  input.value = ''; // reset para permitir reenvio
+}
+</script>
+{% endblock %}

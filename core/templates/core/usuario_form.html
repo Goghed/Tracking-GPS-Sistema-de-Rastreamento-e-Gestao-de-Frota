@@ -1,0 +1,137 @@
+{% extends 'core/base.html' %}
+{% block title %}{{ acao }} — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / <a href="{% url 'usuarios' %}" style="color:var(--muted);text-decoration:none;">Usuários</a> / {{ acao }}{% endblock %}
+
+{% block content %}
+<style>
+  .form-card {
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:14px; padding:32px;
+    max-width:560px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
+  }
+  .form-title { font-size:20px; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .form-sub   { font-size:12px; color:var(--muted); margin-bottom:28px; }
+
+  .form-row   { margin-bottom:20px; }
+  .form-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+  label {
+    display:block; font-size:11px; font-weight:700; font-family:var(--mono);
+    text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:6px;
+  }
+  input[type=text], input[type=email], input[type=password] {
+    width:100%; padding:10px 13px; border-radius:8px;
+    border:1px solid var(--border2); background:var(--bg);
+    color:var(--text); font-size:13px; outline:none;
+    transition:border-color .15s;
+    box-sizing:border-box;
+  }
+  input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,130,246,.12); }
+
+  .toggle-row {
+    display:flex; align-items:center; gap:12px;
+    padding:14px 16px; border-radius:10px;
+    border:1px solid var(--border2); background:var(--bg);
+    margin-bottom:20px; cursor:pointer;
+  }
+  .toggle-row input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); cursor:pointer; }
+  .toggle-label { font-size:13px; color:var(--text); font-weight:500; }
+  .toggle-sub   { font-size:11px; color:var(--muted); margin-top:1px; }
+
+  .form-hint { font-size:11px; color:var(--muted); margin-top:5px; }
+
+  .form-footer { display:flex; gap:12px; margin-top:28px; }
+
+  .msg-ok  { background:rgba(16,185,129,.1); color:#059669; border:1px solid rgba(16,185,129,.25);
+             padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
+  .msg-err { background:rgba(239,68,68,.1);  color:#dc2626; border:1px solid rgba(239,68,68,.25);
+             padding:10px 16px; border-radius:8px; margin-bottom:16px; font-size:13px; }
+
+  .pwd-wrap { position:relative; }
+  .pwd-toggle {
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    background:none; border:none; cursor:pointer; color:var(--muted);
+    font-size:14px; padding:4px;
+  }
+</style>
+
+{% for msg in messages %}
+  {% if msg.tags == 'success' %}<div class="msg-ok">{{ msg }}</div>{% endif %}
+  {% if msg.tags == 'error'   %}<div class="msg-err">{{ msg }}</div>{% endif %}
+{% endfor %}
+
+<div class="form-card">
+  <div class="form-title">{{ acao }}</div>
+  <div class="form-sub">{% if obj %}Editando dados do usuário <strong>{{ obj.username }}</strong>{% else %}Preencha os dados para criar um novo acesso{% endif %}</div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="form-row">
+      <label for="id_username">Usuário (login)</label>
+      <input type="text" id="id_username" name="username"
+             value="{{ obj.username|default:'' }}"
+             {% if obj %}readonly style="opacity:.6;cursor:not-allowed"{% endif %}
+             placeholder="ex: joao.silva" required>
+      {% if obj %}<div class="form-hint">O nome de usuário não pode ser alterado.</div>{% endif %}
+    </div>
+
+    <div class="form-row-2">
+      <div>
+        <label for="id_first_name">Nome</label>
+        <input type="text" id="id_first_name" name="first_name"
+               value="{{ obj.first_name|default:'' }}" placeholder="Nome">
+      </div>
+      <div>
+        <label for="id_last_name">Sobrenome</label>
+        <input type="text" id="id_last_name" name="last_name"
+               value="{{ obj.last_name|default:'' }}" placeholder="Sobrenome">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="id_email">E-mail</label>
+      <input type="email" id="id_email" name="email"
+             value="{{ obj.email|default:'' }}" placeholder="email@exemplo.com">
+    </div>
+
+    <div class="form-row">
+      <label for="id_password">{% if obj %}Nova senha{% else %}Senha{% endif %}</label>
+      <div class="pwd-wrap">
+        <input type="password" id="id_password" name="password"
+               placeholder="{% if obj %}Deixe em branco para não alterar{% else %}Mínimo 6 caracteres{% endif %}"
+               {% if not obj %}required{% endif %}>
+        <button type="button" class="pwd-toggle" onclick="toggleSenha()">👁</button>
+      </div>
+      {% if obj %}<div class="form-hint">Deixe em branco para manter a senha atual.</div>{% endif %}
+    </div>
+
+    <label for="id_is_staff" style="display:none"></label>
+    <div class="toggle-row" onclick="document.getElementById('id_is_staff').click()">
+      <input type="checkbox" id="id_is_staff" name="is_staff"
+             {% if obj and obj.is_staff %}checked{% endif %}
+             onclick="event.stopPropagation()">
+      <div>
+        <div class="toggle-label">Administrador</div>
+        <div class="toggle-sub">Permite acesso à área de usuários e configurações</div>
+      </div>
+    </div>
+
+    <div class="form-footer">
+      <a href="{% url 'usuarios' %}" class="btn btn-ghost" style="font-size:13px;padding:9px 18px;">Cancelar</a>
+      <button type="submit" class="btn btn-primary" style="font-size:13px;padding:9px 22px;">
+        {% if obj %}Salvar alterações{% else %}Criar usuário{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleSenha() {
+  const inp = document.getElementById('id_password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,214 @@
+{% extends 'core/base.html' %}
+{% block title %}{% if obj %}Editar Manutenção{% else %}Nova Manutenção{% endif %} — Tracking GPS{% endblock %}
+{% block topbar_title %}<span>Tracking GPS</span> / <a href="{% url 'frota' %}" style="color:var(--muted);text-decoration:none;">Gestão de Frota</a> / {% if obj %}Editar Manutenção{% else %}Nova Manutenção{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .form-card { background:var(--bg2); border:1px solid var(--border2); border-radius:14px; padding:32px; max-width:720px; }
+  .form-title { font-size:20px; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .form-sub   { font-size:12px; color:var(--muted); margin-bottom:28px; }
+  .form-grid  { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .form-row   { margin-bottom:18px; }
+  .form-full  { grid-column:1/-1; }
+  label { display:block; font-size:11px; font-weight:700; font-family:var(--mono); text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:6px; }
+  input[type=text],input[type=number],input[type=date],select,textarea {
+    width:100%; padding:10px 13px; border-radius:8px; border:1px solid var(--border2);
+    background:var(--bg); color:var(--text); font-size:13px; outline:none; box-sizing:border-box;
+  }
+  input:focus,select:focus,textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,130,246,.1); }
+  textarea { min-height:90px; resize:vertical; font-family:inherit; }
+
+  /* Upload de arquivos */
+  .upload-zone {
+    border:2px dashed var(--border2); border-radius:10px; padding:24px;
+    text-align:center; cursor:pointer; transition:all .15s; background:var(--bg);
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color:var(--accent); background:rgba(59,130,246,.04); }
+  .upload-zone input { display:none; }
+  .upload-icon { font-size:28px; margin-bottom:8px; }
+  .upload-txt  { font-size:13px; color:var(--muted); }
+  .upload-txt strong { color:var(--accent); cursor:pointer; }
+  .upload-hint { font-size:11px; color:var(--muted); margin-top:4px; }
+  .file-list   { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .file-chip   { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:8px; background:var(--bg2); border:1px solid var(--border2); font-size:12px; }
+  .file-chip .rm { cursor:pointer; color:var(--muted); font-size:14px; line-height:1; }
+  .file-chip .rm:hover { color:var(--red); }
+
+  /* Arquivos existentes */
+  .existing-files { margin-bottom:14px; }
+  .existing-chip  { display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:8px; background:var(--bg); border:1px solid var(--border2); font-size:12px; margin:4px 4px 4px 0; }
+  .existing-chip a { color:var(--accent); text-decoration:none; }
+  .existing-chip a:hover { text-decoration:underline; }
+  .del-arq { background:none; border:none; cursor:pointer; color:var(--muted); font-size:14px; padding:0; line-height:1; }
+  .del-arq:hover { color:var(--red); }
+
+  .form-footer { display:flex; gap:12px; margin-top:28px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-card">
+  <div class="form-title">{% if obj %}Editar Manutenção{% else %}Nova Manutenção{% endif %}</div>
+  <div class="form-sub">{% if obj %}Editando registro de {{ obj.vehicle.placa }} — {{ obj.data_manutencao|date:"d/m/Y" }}{% else %}Preencha os dados da manutenção{% endif %}</div>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-grid">
+
+      <div class="form-row">
+        <label>Veículo *</label>
+        <select name="vehicle" required>
+          <option value="">Selecione...</option>
+          {% for v in veiculos %}
+          <option value="{{ v.pk }}" {% if obj and obj.vehicle_id == v.pk %}selected{% endif %}>{{ v.placa }}{% if v.descricao %} — {{ v.descricao|truncatechars:25 }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Data *</label>
+        <input type="date" name="data_manutencao" required value="{% if obj %}{{ obj.data_manutencao|date:'Y-m-d' }}{% endif %}">
+      </div>
+
+      <div class="form-row">
+        <label>Tipo *</label>
+        <select name="tipo" required>
+          <option value="preventiva" {% if not obj or obj.tipo == 'preventiva' %}selected{% endif %}>Preventiva</option>
+          <option value="corretiva"  {% if obj and obj.tipo == 'corretiva'  %}selected{% endif %}>Corretiva</option>
+          <option value="revisao"    {% if obj and obj.tipo == 'revisao'    %}selected{% endif %}>Revisão</option>
+          <option value="pneu"       {% if obj and obj.tipo == 'pneu'       %}selected{% endif %}>Pneu / Borracharia</option>
+          <option value="funilaria"  {% if obj and obj.tipo == 'funilaria'  %}selected{% endif %}>Funilaria / Pintura</option>
+          <option value="eletrica"   {% if obj and obj.tipo == 'eletrica'   %}selected{% endif %}>Elétrica</option>
+          <option value="outros"     {% if obj and obj.tipo == 'outros'     %}selected{% endif %}>Outros</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Status</label>
+        <select name="status">
+          <option value="concluida"    {% if not obj or obj.status == 'concluida'    %}selected{% endif %}>Concluída</option>
+          <option value="agendada"     {% if obj and obj.status == 'agendada'        %}selected{% endif %}>Agendada</option>
+          <option value="em_andamento" {% if obj and obj.status == 'em_andamento'    %}selected{% endif %}>Em andamento</option>
+        </select>
+      </div>
+
+      <div class="form-row form-full">
+        <label>Descrição *</label>
+        <input type="text" name="descricao" required maxlength="200"
+               value="{% if obj %}{{ obj.descricao }}{% endif %}"
+               placeholder="Ex: Troca de óleo e filtros, revisão 30.000 km...">
+      </div>
+
+      <div class="form-row">
+        <label>Fornecedor / Oficina</label>
+        <input type="text" name="fornecedor" maxlength="100"
+               value="{% if obj %}{{ obj.fornecedor }}{% endif %}"
+               placeholder="Nome da oficina ou fornecedor">
+      </div>
+
+      <div class="form-row">
+        <label>Custo (R$)</label>
+        <input type="number" name="custo" step="0.01" min="0"
+               value="{% if obj and obj.custo %}{{ obj.custo }}{% endif %}"
+               placeholder="0,00">
+      </div>
+
+      <div class="form-row">
+        <label>KM na manutenção</label>
+        <input type="number" name="km_na_manutencao" min="0"
+               value="{% if obj and obj.km_na_manutencao %}{{ obj.km_na_manutencao }}{% endif %}"
+               placeholder="Ex: 45000">
+      </div>
+
+      <div class="form-row form-full">
+        <label>Observações</label>
+        <textarea name="observacoes" placeholder="Detalhes adicionais, peças trocadas, garantia...">{% if obj %}{{ obj.observacoes }}{% endif %}</textarea>
+      </div>
+
+      <!-- Arquivos existentes -->
+      {% if obj and obj.arquivos.all %}
+      <div class="form-row form-full">
+        <label>Arquivos anexados</label>
+        <div class="existing-files">
+          {% for arq in obj.arquivos.all %}
+          <span class="existing-chip" id="chip-{{ arq.pk }}">
+            {% if arq.eh_imagem %}🖼{% else %}📄{% endif %}
+            <a href="{{ arq.arquivo.url }}" target="_blank">{{ arq.nome_original|default:arq.arquivo.name }}</a>
+            <button type="button" class="del-arq" onclick="deletarArquivo({{ arq.pk }}, 'manutencao')" title="Remover">✕</button>
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Upload de novos arquivos -->
+      <div class="form-row form-full">
+        <label>{% if obj %}Adicionar arquivos{% else %}Arquivos{% endif %} (orçamentos, notas, fotos)</label>
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('arq-input').click()"
+             ondragover="event.preventDefault();this.classList.add('drag')"
+             ondragleave="this.classList.remove('drag')"
+             ondrop="onDrop(event)">
+          <input type="file" id="arq-input" name="arquivos" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="onFiles(this.files)">
+          <div class="upload-icon">📎</div>
+          <div class="upload-txt"><strong>Clique para selecionar</strong> ou arraste aqui</div>
+          <div class="upload-hint">Imagens, PDF, Word, Excel — múltiplos arquivos</div>
+        </div>
+        <div class="file-list" id="file-list"></div>
+      </div>
+
+    </div>
+
+    <div class="form-footer">
+      <a href="{% url 'frota' %}" class="btn btn-ghost" style="font-size:13px;padding:9px 18px;">Cancelar</a>
+      <button type="submit" class="btn btn-primary" style="font-size:13px;padding:9px 22px;">
+        {% if obj %}Salvar alterações{% else %}Registrar manutenção{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let _files = new DataTransfer();
+
+function onFiles(flist) {
+  for (const f of flist) _files.items.add(f);
+  renderChips();
+  document.getElementById('arq-input').files = _files.files;
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  onFiles(e.dataTransfer.files);
+}
+function renderChips() {
+  const list = document.getElementById('file-list');
+  list.innerHTML = '';
+  for (let i = 0; i < _files.files.length; i++) {
+    const f = _files.files[i];
+    const chip = document.createElement('span');
+    chip.className = 'file-chip';
+    chip.innerHTML = `📄 ${f.name} <span class="rm" onclick="removeFile(${i})">✕</span>`;
+    list.appendChild(chip);
+  }
+}
+function removeFile(idx) {
+  const dt = new DataTransfer();
+  for (let i = 0; i < _files.files.length; i++) {
+    if (i !== idx) dt.items.add(_files.files[i]);
+  }
+  _files = dt;
+  document.getElementById('arq-input').files = _files.files;
+  renderChips();
+}
+function deletarArquivo(pk, tipo) {
+  if (!confirm('Remover este arquivo?')) return;
+  fetch(`/frota/${tipo}/arquivo/${pk}/deletar/`, {
+    method:'POST', headers:{'X-CSRFToken': CSRF}
+  }).then(r => r.json()).then(d => {
+    if (d.ok) document.getElementById(`chip-${pk}`)?.remove();
+  });
+}
+</script>
+{% endblock %}

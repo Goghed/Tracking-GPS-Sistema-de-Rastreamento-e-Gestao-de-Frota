@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Tracking GPS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0f12; --bg2: #13161b; --border: #252a35;
+      --text: #e2e8f0; --muted: #64748b; --accent: #3b82f6;
+      --mono: 'Space Mono', monospace; --sans: 'DM Sans', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-box {
+      width: 380px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 40px;
+    }
+    .brand {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+    .tagline {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 36px;
+    }
+    label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      background: #0d0f12;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+      margin-bottom: 18px;
+      transition: border-color .15s;
+    }
+    input:focus { border-color: var(--accent); }
+    button {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background .15s;
+    }
+    button:hover { background: #1d4ed8; }
+    .error {
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      color: #ef4444;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="brand">Tracking GPS</div>
+    <div class="tagline">Monitorando em Tempo Real</div>
+
+    {% if form.errors %}
+    <div class="error">Usuário ou senha incorretos.</div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <label>Usuário</label>
+      <input type="text" name="username" autofocus autocomplete="username">
+      <label>Senha</label>
+      <input type="password" name="password" autocomplete="current-password">
+      <input type="hidden" name="next" value="{{ next }}">
+      <button type="submit">Entrar →</button>
+    </form>
+  </div>
+</body>
+</html>

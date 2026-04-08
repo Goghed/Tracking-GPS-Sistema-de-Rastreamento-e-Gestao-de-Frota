@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Tracking GPS{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #f1f5f9;
+      --bg2:      #ffffff;
+      --bg3:      #f8fafc;
+      --border:   #e2e8f0;
+      --border2:  #cbd5e1;
+      --text:     #0f172a;
+      --muted:    #64748b;
+      --accent:   #3b82f6;
+      --accent2:  #2563eb;
+      --green:    #10b981;
+      --red:      #ef4444;
+      --yellow:   #f59e0b;
+      --mono:     'Space Mono', monospace;
+      --sans:     'DM Sans', sans-serif;
+      --radius:   8px;
+      /* Sidebar (dark para contrastar com fundo claro) */
+      --sb-bg:    #0f172a;
+      --sb-bg2:   #1e293b;
+      --sb-text:  #94a3b8;
+      --sb-active:#60a5fa;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 14px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-weight: 400;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      position: fixed; top: 0; left: 0;
+      width: 220px; height: 100vh;
+      background: var(--sb-bg);
+      border-right: none;
+      display: flex; flex-direction: column;
+      z-index: 100;
+      box-shadow: 4px 0 16px rgba(0,0,0,.12);
+    }
+    .sidebar-logo {
+      padding: 22px 18px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .sidebar-logo .brand {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--sb-active);
+      letter-spacing: 1px;
+    }
+    .sidebar-logo .tagline {
+      font-size: 10px;
+      color: #475569;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .sidebar-nav {
+      flex: 1;
+      padding: 12px 0;
+      overflow-y: auto;
+    }
+    .nav-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #334155;
+      padding: 14px 18px 6px;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 18px;
+      color: var(--sb-text);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 400;
+      transition: all .15s;
+      border-left: 2px solid transparent;
+      position: relative;
+    }
+    .nav-link:hover { color: #e2e8f0; background: rgba(255,255,255,.05); }
+    .nav-link.active {
+      color: var(--sb-active);
+      border-left-color: var(--sb-active);
+      background: rgba(96,165,250,.1);
+    }
+    .nav-icon { width: 16px; text-align: center; font-size: 14px; }
+    .nav-badge {
+      margin-left: auto;
+      background: var(--red);
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 20px;
+    }
+    .sidebar-footer {
+      padding: 14px 18px;
+      border-top: 1px solid rgba(255,255,255,.06);
+      font-size: 11px;
+      color: #475569;
+    }
+    .sidebar-footer .user { color: #e2e8f0; font-weight: 500; }
+    .sidebar-footer a { color: #475569 !important; }
+    .sidebar-footer a:hover { color: var(--sb-text) !important; }
+
+    /* ── Topbar ── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 220px; right: 0;
+      height: 52px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 4px rgba(0,0,0,.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 90;
+    }
+    .topbar-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+    .topbar-title span { color: var(--text); font-weight: 700; }
+    .topbar-actions { display: flex; align-items: center; gap: 12px; }
+    .sync-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all .15s;
+      letter-spacing: .5px;
+    }
+    .sync-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(59,130,246,.06); }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .sync-dot.syncing { animation: pulse 1s infinite; background: var(--yellow); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Main content ── */
+    .main {
+      margin-left: 220px;
+      padding-top: 52px;
+      min-height: 100vh;
+    }
+    .content { padding: 24px; }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .page-title {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .page-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.02);
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── KPI cards ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 16px; margin-bottom: 24px; }
+    .kpi {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+      transition: box-shadow .2s, transform .2s;
+    }
+    .kpi:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); transform: translateY(-1px); }
+    .kpi::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--kpi-color, var(--accent));
+    }
+    .kpi-value {
+      font-family: var(--mono);
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--kpi-color, var(--text));
+      line-height: 1;
+    }
+    .kpi-label { font-size: 11px; color: var(--muted); margin-top: 6px; letter-spacing: .5px; text-transform: uppercase; }
+    .kpi-icon { position: absolute; right: 16px; top: 16px; font-size: 26px; opacity: .08; color: var(--kpi-color, var(--text)); }
+
+    /* ── Grid layouts ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    /* ── Tabela ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+      background: var(--bg3);
+    }
+    td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f0f9ff; }
+    .mono { font-family: var(--mono); font-size: 12px; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
+    .badge-green  { background: rgba(16,185,129,.12);  color: #059669; }
+    .badge-red    { background: rgba(239,68,68,.12);    color: #dc2626; }
+    .badge-yellow { background: rgba(245,158,11,.12);   color: #b45309; }
+    .badge-blue   { background: rgba(59,130,246,.12);   color: #2563eb; }
+    .badge-gray   { background: rgba(100,116,139,.1);   color: var(--muted); }
+
+    /* ── Dot status ── */
+    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .dot-green  { background: var(--green); box-shadow: 0 0 6px rgba(16,185,129,.5); }
+    .dot-red    { background: var(--red); }
+    .dot-gray   { background: var(--muted); }
+    .dot-yellow { background: var(--yellow); animation: pulse 1.5s infinite; }
+
+    /* ── Botões ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 1px solid transparent;
+      text-decoration: none;
+      transition: all .15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent2); box-shadow: 0 4px 12px rgba(59,130,246,.3); }
+    .btn-ghost { background: transparent; color: var(--muted); border-color: var(--border2); }
+    .btn-ghost:hover { color: var(--accent); border-color: var(--accent); background: rgba(59,130,246,.06); }
+
+    /* ── Filtros ── */
+    .filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+    .filter-input {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: var(--radius);
+      font-family: var(--sans);
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .filter-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+    .filter-select {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 7px 10px;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 11px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .filter-select:focus { border-color: var(--accent); }
+
+    /* ── Messages ── */
+    .messages { margin-bottom: 16px; }
+    .msg { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin-bottom: 8px; border-left: 3px solid; }
+    .msg-success { background: rgba(16,185,129,.08); border-color: var(--green); color: #059669; }
+    .msg-error   { background: rgba(239,68,68,.08);  border-color: var(--red); color: #dc2626; }
+    .msg-info    { background: rgba(59,130,246,.08);  border-color: var(--accent); color: var(--accent2); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-220px); transition: transform .2s; }
+      .sidebar.open { transform: translateX(0); }
+      .topbar, .main { left: 0; margin-left: 0; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    /* ══ Popup Ignição ══════════════════════════════════════════ */
+    @keyframes ign-overlay-in { from{opacity:0} to{opacity:1} }
+    @keyframes ign-modal-in   {
+      from { opacity:0; transform: translateY(-24px) scale(.95); }
+      to   { opacity:1; transform: none; }
+    }
+
+    .ignicao-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,23,42,.55);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: ign-overlay-in .2s ease;
+    }
+    .ignicao-modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 32px 80px rgba(0,0,0,.22), 0 0 0 1px rgba(0,0,0,.04);
+      animation: ign-modal-in .28s cubic-bezier(.34,1.4,.64,1);
+      overflow: hidden;
+    }
+    /* Faixa colorida no topo */
+    .ignicao-bar { height: 5px; width: 100%; }
+    .ignicao-bar-ok     { background: linear-gradient(90deg,#10b981,#34d399); }
+    .ignicao-bar-alerta { background: linear-gradient(90deg,#ef4444,#f59e0b); }
+
+    .ignicao-body { padding: 22px 24px 24px; }
+
+    /* Header */
+    .ignicao-hdr {
+      display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px;
+    }
+    .ignicao-icon-wrap {
+      width: 46px; height: 46px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .ignicao-icon-ok     { background: rgba(16,185,129,.12); }
+    .ignicao-icon-alerta { background: rgba(239,68,68,.12); }
+    .ignicao-hdr-txt { flex: 1; }
+    .ignicao-label {
+      font-family: var(--mono); font-size: 9px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase; margin-bottom: 3px;
+    }
+    .ignicao-label-ok     { color: #059669; }
+    .ignicao-label-alerta { color: #dc2626; }
+    .ignicao-title-txt { font-size: 15px; font-weight: 700; color: #0f172a; }
+    .ignicao-close {
+      background: none; border: none; cursor: pointer;
+      color: #94a3b8; font-size: 20px; padding: 2px 6px;
+      border-radius: 6px; line-height: 1; flex-shrink: 0; margin-top: -2px;
+    }
+    .ignicao-close:hover { background: #f1f5f9; color: #475569; }
+
+    /* Card do veículo dentro do popup */
+    .ignicao-vcard {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px; background: #f8fafc;
+      border: 1px solid #e2e8f0; border-radius: 10px;
+      margin-bottom: 14px;
+    }
+    .ignicao-vcard-icon {
+      width: 58px; height: 46px; background: #e8eef4;
+      border-radius: 8px; display: flex;
+      align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .ignicao-vcard-icon svg { width: 42px; height: 34px; opacity: .55; }
+    .ignicao-placa {
+      font-family: var(--mono); font-size: 18px;
+      font-weight: 700; color: #0f172a; letter-spacing: 1px;
+    }
+    .ignicao-descricao { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .ignicao-horario {
+      font-family: var(--mono); font-size: 10px;
+      color: #94a3b8; margin-top: 5px;
+    }
+
+    /* Mensagem */
+    .ignicao-msg {
+      padding: 11px 14px; border-radius: 8px;
+      font-size: 13px; line-height: 1.55;
+      margin-bottom: 20px; border-left: 3px solid;
+    }
+    .ignicao-msg-ok     { background: rgba(16,185,129,.07); color: #059669; border-color: #10b981; }
+    .ignicao-msg-alerta { background: rgba(239,68,68,.07);  color: #dc2626; border-color: #ef4444; }
+
+    /* Footer */
+    .ignicao-footer { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* Bloco de localização no popup */
+    .ignicao-localizacao {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 14px; background: #f0f9ff;
+      border: 1px solid #bae6fd; border-radius: 10px;
+      margin-bottom: 14px;
+    }
+    .ignicao-loc-icon { font-size: 20px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+    .ignicao-loc-txt  { flex: 1; min-width: 0; }
+    .ignicao-loc-label {
+      font-family: var(--mono); font-size: 9px; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase; color: #0369a1; margin-bottom: 3px;
+    }
+    .ignicao-loc-end  { font-size: 12px; color: #0f172a; line-height: 1.45; word-break: break-word; }
+    .ignicao-loc-maps {
+      display: inline-block; margin-top: 5px;
+      font-size: 11px; color: #0284c7; text-decoration: none;
+    }
+    .ignicao-loc-maps:hover { text-decoration: underline; }
+
+    /* Badge de contagem de eventos não autorizados */
+    .ign-nao-auth-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(239,68,68,.1); color: #dc2626;
+      font-family: var(--mono); font-size: 9px; font-weight: 700;
+      padding: 2px 7px; border-radius: 20px; letter-spacing: .5px;
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">TRACKING GPS</div>
+    <div class="tagline">Rastreamento em Tempo Real</div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-label">Monitoramento</div>
+    <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+      <span class="nav-icon">◈</span> Dashboard
+    </a>
+    <a href="{% url 'mapa' %}" class="nav-link {% if request.resolver_match.url_name == 'mapa' %}active{% endif %}">
+      <span class="nav-icon">◎</span> Mapa ao vivo
+    </a>
+    <a href="{% url 'veiculos' %}" class="nav-link {% if request.resolver_match.url_name == 'veiculos' %}active{% endif %}">
+      <span class="nav-icon">▣</span> Veículos
+    </a>
+
+    <div class="nav-label">Eventos</div>
+    <a href="{% url 'alertas' %}" class="nav-link {% if request.resolver_match.url_name == 'alertas' %}active{% endif %}">
+      <span class="nav-icon">⚠</span> Alertas
+      {% if nao_lidos %}<span class="nav-badge">{{ nao_lidos }}</span>{% endif %}
+    </a>
+    <a href="{% url 'frota' %}" class="nav-link {% if request.resolver_match.url_name in 'frota,manutencao_criar,manutencao_editar,ocorrencia_criar,ocorrencia_editar' %}active{% endif %}">
+      <span class="nav-icon">🔧</span> Gestão de Frota
+    </a>
+
+    <div class="nav-label">Dados</div>
+    <a href="{% url 'relatorios' %}" class="nav-link {% if request.resolver_match.url_name == 'relatorios' %}active{% endif %}">
+      <span class="nav-icon">≡</span> Relatórios
+    </a>
+    {% if request.user.is_staff or request.user.is_superuser %}
+    <a href="{% url 'usuarios' %}" class="nav-link {% if request.resolver_match.url_name in 'usuarios,usuario_criar,usuario_editar' %}active{% endif %}">
+      <span class="nav-icon">⊙</span> Usuários
+    </a>
+    {% endif %}
+  </div>
+  <div class="sidebar-footer">
+    <div class="user">{{ request.user.get_full_name|default:request.user.username }}</div>
+    <form method="post" action="{% url 'logout' %}" style="margin:0">
+      {% csrf_token %}
+      <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:0;">Sair →</button>
+    </form>
+  </div>
+</nav>
+
+<div class="topbar">
+  <div class="topbar-title">
+    {% block topbar_title %}
+    <span>Tracking GPS</span> / Dashboard
+    {% endblock %}
+  </div>
+  <div class="topbar-actions">
+    <button class="sync-btn" onclick="syncAgora()" id="sync-btn">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-txt">SYNC</span>
+    </button>
+  </div>
+</div>
+
+<main class="main">
+  <div class="content">
+    {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+      <div class="msg msg-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<script>
+  const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+  /* ══ Sistema de Popup de Ignição (global) ══════════════════ */
+  const _popupQueue = [];
+  let   _popupAtivo = false;
+
+  const _svgCarro = `<svg viewBox="0 0 64 40" fill="none"><rect x="4" y="20" width="56" height="14" rx="3" stroke="#475569" stroke-width="2"/><path d="M12 20 L18 10 H46 L52 20 Z" stroke="#475569" stroke-width="2" fill="none"/><path d="M20 19 L24 12 H40 L44 19 Z" fill="#334155" opacity=".4"/><circle cx="16" cy="35" r="5" stroke="#475569" stroke-width="2"/><circle cx="48" cy="35" r="5" stroke="#475569" stroke-width="2"/><circle cx="16" cy="35" r="2" fill="#475569"/><circle cx="48" cy="35" r="2" fill="#475569"/></svg>`;
+  const _svgMoto  = `<svg viewBox="0 0 64 40" fill="none"><ellipse cx="13" cy="30" rx="9" ry="9" stroke="#475569" stroke-width="2"/><ellipse cx="51" cy="30" rx="9" ry="9" stroke="#475569" stroke-width="2"/><path d="M22 30 L30 16 L40 16 L48 30" stroke="#475569" stroke-width="2" fill="none"/><path d="M30 16 L34 10 L44 10 L44 16" stroke="#475569" stroke-width="1.5" fill="none"/><circle cx="13" cy="30" r="4" fill="#475569" opacity=".4"/><circle cx="51" cy="30" r="4" fill="#475569" opacity=".4"/></svg>`;
+  const _svgCami  = `<svg viewBox="0 0 64 40" fill="none"><rect x="4" y="12" width="36" height="20" rx="2" stroke="#475569" stroke-width="2"/><rect x="40" y="18" width="18" height="14" rx="2" stroke="#475569" stroke-width="2"/><circle cx="14" cy="33" r="5" stroke="#475569" stroke-width="2"/><circle cx="48" cy="33" r="5" stroke="#475569" stroke-width="2"/><circle cx="14" cy="33" r="2" fill="#475569" opacity=".4"/><circle cx="48" cy="33" r="2" fill="#475569" opacity=".4"/><rect x="42" y="20" width="14" height="8" rx="1" fill="#475569" opacity=".25"/></svg>`;
+
+  function _svgParaTipo(tipo) {
+    if (tipo === '2') return _svgMoto;
+    if (tipo === '7') return _svgCami;
+    return _svgCarro;
+  }
+
+  function mostrarPopupIgnicao(veiculo, evento) {
+    _popupQueue.push({ veiculo, evento });
+    if (!_popupAtivo) _exibirProximoPopup();
+  }
+
+  function _exibirProximoPopup() {
+    if (_popupQueue.length === 0) { _popupAtivo = false; return; }
+    _popupAtivo = true;
+    const { veiculo, evento } = _popupQueue.shift();
+
+    document.querySelectorAll('.ignicao-overlay').forEach(el => el.remove());
+
+    const fs   = evento.eh_fim_semana;
+    const tipo = veiculo.tipo || '';
+    const pendentes = _popupQueue.length;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'ignicao-overlay';
+    overlay.innerHTML = `
+      <div class="ignicao-modal">
+        <div class="ignicao-bar ${fs ? 'ignicao-bar-alerta' : 'ignicao-bar-ok'}"></div>
+        <div class="ignicao-body">
+
+          <div class="ignicao-hdr">
+            <div class="ignicao-icon-wrap ${fs ? 'ignicao-icon-alerta' : 'ignicao-icon-ok'}">
+              ${fs ? '⚠️' : '✅'}
+            </div>
+            <div class="ignicao-hdr-txt">
+              <div class="ignicao-label ${fs ? 'ignicao-label-alerta' : 'ignicao-label-ok'}">
+                ${fs ? '⚠ Uso não autorizado' : '● Veículo ligado'}
+              </div>
+              <div class="ignicao-title-txt">${evento.dia_semana} · ${evento.hora}</div>
+            </div>
+            <button class="ignicao-close" onclick="fecharPopupIgnicao()">✕</button>
+          </div>
+
+          <div class="ignicao-vcard">
+            <div class="ignicao-vcard-icon">${_svgParaTipo(tipo)}</div>
+            <div>
+              <div class="ignicao-placa">${veiculo.placa || '—'}</div>
+              <div class="ignicao-descricao">${(veiculo.descricao || '').substring(0, 40)}</div>
+              <div class="ignicao-horario">⊙ Ignição detectada às ${evento.hora}</div>
+            </div>
+          </div>
+
+          ${(veiculo.latitude && veiculo.longitude) ? `
+          <div class="ignicao-localizacao" id="popup-loc-${veiculo.id}">
+            <div class="ignicao-loc-icon">📍</div>
+            <div class="ignicao-loc-txt">
+              <div class="ignicao-loc-label">Localização atual</div>
+              <div class="ignicao-loc-end" id="popup-end-${veiculo.id}">Buscando endereço...</div>
+              <a class="ignicao-loc-maps"
+                 href="https://maps.google.com/?q=${veiculo.latitude},${veiculo.longitude}"
+                 target="_blank" rel="noopener">Ver no Google Maps →</a>
+            </div>
+          </div>` : ''}
+
+          <div class="ignicao-msg ${fs ? 'ignicao-msg-alerta' : 'ignicao-msg-ok'}">
+            ${evento.mensagem}
+          </div>
+
+          ${pendentes > 0 ? `<div style="font-size:11px;color:#94a3b8;font-family:var(--mono);margin-bottom:14px">+${pendentes} outro(s) evento(s) na fila</div>` : ''}
+
+          <div class="ignicao-footer">
+            <a href="/veiculos/${veiculo.id}/" class="btn btn-ghost" style="padding:7px 14px;font-size:11px">Ver veículo →</a>
+            <button class="btn ${fs ? 'btn-primary' : 'btn-primary'}"
+                    style="padding:7px 18px;font-size:11px;${fs ? 'background:#ef4444;border-color:#ef4444' : ''}"
+                    onclick="fecharPopupIgnicao()">
+              Entendido
+            </button>
+          </div>
+
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    // Busca endereço via Nominatim se tiver coordenadas
+    if (veiculo.latitude && veiculo.longitude) {
+      const endEl = document.getElementById(`popup-end-${veiculo.id}`);
+      if (endEl) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${veiculo.latitude}&lon=${veiculo.longitude}&accept-language=pt-BR`, {
+          headers: { 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(geo => {
+          const addr = geo.address || {};
+          const partes = [
+            addr.road,
+            addr.house_number,
+            addr.suburb || addr.neighbourhood,
+            addr.city || addr.town || addr.municipality,
+            addr.state
+          ].filter(Boolean);
+          endEl.textContent = partes.length ? partes.join(', ') : (geo.display_name || 'Endereço não encontrado');
+        })
+        .catch(() => { if (endEl) endEl.textContent = 'Não foi possível obter o endereço'; });
+      }
+    }
+
+    // Fechar ao clicar no overlay (só em dia autorizado)
+    if (!fs) {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) fecharPopupIgnicao();
+      });
+      // Auto-fecha em 25 segundos se autorizado
+      setTimeout(() => { if (overlay.parentNode) fecharPopupIgnicao(); }, 25000);
+    }
+  }
+
+  function fecharPopupIgnicao() {
+    document.querySelectorAll('.ignicao-overlay').forEach(el => el.remove());
+    _popupAtivo = false;
+    if (_popupQueue.length > 0) setTimeout(_exibirProximoPopup, 350);
+  }
+
+  function syncAgora() {
+    const btn = document.getElementById('sync-btn');
+    const dot = document.getElementById('sync-dot');
+    const txt = document.getElementById('sync-txt');
+    dot.classList.add('syncing');
+    txt.textContent = 'SYNC...';
+    btn.disabled = true;
+
+    fetch('{% url "sync_agora" %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF}
+    })
+    .then(r => r.json())
+    .then(d => {
+      dot.classList.remove('syncing');
+      txt.textContent = 'SYNC ✓';
+      setTimeout(() => { txt.textContent = 'SYNC'; btn.disabled = false; }, 2000);
+    })
+    .catch(() => {
+      dot.classList.remove('syncing');
+      txt.textContent = 'ERRO';
+      btn.disabled = false;
+    });
+  }
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>
