@@ -677,14 +677,7 @@
       }
     }
 
-    // Fechar ao clicar no overlay (só em dia autorizado)
-    if (!fs) {
-      overlay.addEventListener('click', function(e) {
-        if (e.target === overlay) fecharPopupIgnicao();
-      });
-      // Auto-fecha em 25 segundos se autorizado
-      setTimeout(() => { if (overlay.parentNode) fecharPopupIgnicao(); }, 25000);
-    }
+    // Popup só fecha pelo botão — sem auto-close e sem fechar ao clicar fora
   }
 
   function fecharPopupIgnicao() {

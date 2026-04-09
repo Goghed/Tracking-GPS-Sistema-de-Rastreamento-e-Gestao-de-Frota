@@ -117,7 +117,7 @@ def api_veiculos_posicao(request):
     veiculos = Vehicle.objects.filter(ativo=True).values(
         'id', 'placa', 'descricao', 'latitude', 'longitude',
         'velocidade_atual', 'ignicao', 'direcao', 'ultima_posicao',
-        'km_base', 'km_percorrido_hoje',
+        'km_base', 'km_percorrido_hoje', 'tipo',
     )
     data = []
     for v in veiculos:

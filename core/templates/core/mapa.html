@@ -246,70 +246,86 @@ let cidadeAtual      = 'todos';
 let veiculoFocado    = null;
 let primeiraRenderizacao = true; // controla o fitBounds inicial
 
-/* ── Ícones de carro SVG (vista aérea realista) ── */
+/* ── Ícone de carro SVG (vista lateral) ── */
 function makeCarIcon(cor, direcao, pulsar) {
-  const rot  = (direcao != null && direcao !== '') ? direcao : 0;
-  const glow = pulsar ? `filter:drop-shadow(0 0 5px ${cor}cc);` : '';
-  /* Vista de cima — frente aponta para CIMA (norte), rotação pelo campo direção */
+  const glow = pulsar ? `filter:drop-shadow(0 0 6px ${cor}cc);` : `filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5));`;
   const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 64" width="28" height="44"
-       style="transform:rotate(${rot}deg);${glow}display:block;overflow:visible;">
-    <defs>
-      <filter id="sombra" x="-30%" y="-20%" width="160%" height="140%">
-        <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,0.35)"/>
-      </filter>
-    </defs>
-
-    <!-- carroceria principal -->
-    <path d="M7,52 Q5,56 8,58 L32,58 Q35,56 33,52 L33,18 Q33,14 30,12
-             L27,8 Q24,4 20,4 Q16,4 13,8 L10,12 Q7,14 7,18 Z"
-          fill="${cor}" filter="url(#sombra)"/>
-
-    <!-- para-brisa dianteiro -->
-    <path d="M13,16 Q13.5,10 20,10 Q26.5,10 27,16 L26,20 Q20,22 14,20 Z"
-          fill="rgba(200,230,255,0.75)" stroke="rgba(255,255,255,0.4)" stroke-width="0.5"/>
-
-    <!-- vidro traseiro -->
-    <path d="M14,50 L16,44 Q20,43 24,44 L26,50 Z"
-          fill="rgba(200,230,255,0.55)" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
-
-    <!-- teto (painel central elevado) -->
-    <path d="M14,22 Q14,20 20,20 Q26,20 26,22 L26,42 Q26,44 20,44 Q14,44 14,42 Z"
-          fill="${cor}" opacity="0.6"/>
-
-    <!-- linha divisória teto -->
-    <line x1="20" y1="21" x2="20" y2="43" stroke="rgba(0,0,0,0.12)" stroke-width="0.8"/>
-
-    <!-- faróis dianteiros -->
-    <path d="M8,14 Q9,11 13,11 L13,15 Q10,15 8,14 Z" fill="#fef9c3" opacity="0.95"/>
-    <path d="M32,14 Q31,11 27,11 L27,15 Q30,15 32,14 Z" fill="#fef9c3" opacity="0.95"/>
-
-    <!-- lanternas traseiras -->
-    <path d="M8,55 Q9,58 13,58 L13,54 Q10,54 8,55 Z" fill="#fca5a5" opacity="0.9"/>
-    <path d="M32,55 Q31,58 27,58 L27,54 Q30,54 32,55 Z" fill="#fca5a5" opacity="0.9"/>
-
-    <!-- roda dianteira esquerda -->
-    <rect x="2" y="12" width="6" height="11" rx="2" fill="#1e293b"/>
-    <rect x="3" y="14" width="4" height="7"  rx="1" fill="#334155"/>
-
-    <!-- roda dianteira direita -->
-    <rect x="32" y="12" width="6" height="11" rx="2" fill="#1e293b"/>
-    <rect x="33" y="14" width="4" height="7"  rx="1" fill="#334155"/>
-
-    <!-- roda traseira esquerda -->
-    <rect x="2" y="42" width="6" height="11" rx="2" fill="#1e293b"/>
-    <rect x="3" y="44" width="4" height="7"  rx="1" fill="#334155"/>
-
-    <!-- roda traseira direita -->
-    <rect x="32" y="42" width="6" height="11" rx="2" fill="#1e293b"/>
-    <rect x="33" y="44" width="4" height="7"  rx="1" fill="#334155"/>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 70" width="72" height="42"
+       style="${glow}display:block;overflow:visible;">
+    <!-- sombra chão -->
+    <ellipse cx="60" cy="67" rx="44" ry="3.5" fill="rgba(0,0,0,0.2)"/>
+    <!-- carroceria -->
+    <path d="M12,44 L12,36 Q12,32 16,32 L24,32 L36,18 Q40,13 48,12 L76,12 Q84,12 88,18 L100,32 L106,32 Q110,32 110,36 L110,44 Q110,48 106,48 L98,48 Q96,40 86,40 Q76,40 74,48 L46,48 Q44,40 34,40 Q24,40 22,48 L16,48 Q12,48 12,44 Z"
+          fill="${cor}" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- janela dianteira -->
+    <path d="M54,14 L44,30 L70,30 L72,14 Z"
+          fill="rgba(200,235,255,0.75)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <!-- janela traseira -->
+    <path d="M74,14 L74,30 L88,30 L84,18 Q82,14 78,14 Z"
+          fill="rgba(200,235,255,0.65)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+    <!-- roda traseira -->
+    <circle cx="34" cy="48" r="10" fill="#0f172a" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+    <circle cx="34" cy="48" r="4"  fill="#334155"/>
+    <!-- roda dianteira -->
+    <circle cx="86" cy="48" r="10" fill="#0f172a" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+    <circle cx="86" cy="48" r="4"  fill="#334155"/>
+    <!-- farol -->
+    <ellipse cx="108" cy="36" rx="3" ry="4" fill="#fef9c3" opacity="0.9"/>
+    <!-- lanterna -->
+    <rect x="12" y="34" width="3" height="8" rx="1.5" fill="#fca5a5" opacity="0.85"/>
   </svg>`;
   return L.divIcon({
     className: '',
     html: svg,
-    iconSize:   [28, 44],
-    iconAnchor: [14, 22],
+    iconSize:   [72, 42],
+    iconAnchor: [36, 42],
   });
+}
+
+/* ── Ícone de moto SVG (vista lateral) ── */
+function makeMotoIcon(cor, direcao, pulsar) {
+  const glow = pulsar ? `filter:drop-shadow(0 0 6px ${cor}cc);` : `filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5));`;
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" width="64" height="43"
+       style="${glow}display:block;overflow:visible;">
+    <!-- sombra chão -->
+    <ellipse cx="60" cy="77" rx="44" ry="3.5" fill="rgba(0,0,0,0.2)"/>
+    <!-- roda traseira -->
+    <circle cx="28" cy="60" r="16" fill="#0f172a" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+    <circle cx="28" cy="60" r="6"  fill="#334155"/>
+    <!-- roda dianteira -->
+    <circle cx="92" cy="60" r="16" fill="#0f172a" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+    <circle cx="92" cy="60" r="6"  fill="#334155"/>
+    <!-- garfo dianteiro -->
+    <line x1="82" y1="28" x2="92" y2="44" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round"/>
+    <line x1="86" y1="28" x2="92" y2="44" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round"/>
+    <!-- quadro / motor -->
+    <path d="M28,44 Q36,30 50,28 L66,28 Q74,28 80,34 L86,44 Q74,48 60,48 L38,50 Z"
+          fill="${cor}" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- tanque -->
+    <path d="M50,18 Q56,14 66,14 Q76,14 80,22 L80,30 L50,30 Z"
+          fill="${cor}" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- assento -->
+    <path d="M36,28 Q42,22 52,22 L66,22 Q72,22 74,28 L36,28 Z"
+          fill="${cor}" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-linejoin="round" opacity="0.85"/>
+    <!-- guidão -->
+    <line x1="76" y1="16" x2="84" y2="28" stroke="rgba(255,255,255,0.8)" stroke-width="3" stroke-linecap="round"/>
+    <line x1="70" y1="16" x2="84" y2="18" stroke="rgba(255,255,255,0.8)" stroke-width="3" stroke-linecap="round"/>
+    <!-- motor -->
+    <rect x="40" y="38" width="28" height="12" rx="3" fill="rgba(0,0,0,0.25)"/>
+    <!-- escapamento -->
+    <path d="M28,54 Q20,56 14,60" stroke="rgba(255,255,255,0.5)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  </svg>`;
+  return L.divIcon({
+    className: '',
+    html: svg,
+    iconSize:   [64, 43],
+    iconAnchor: [32, 43],
+  });
+}
+
+function _isMoto(v) {
+  return v.tipo == '2';  // tipo=2 = moto (Honda XRE etc), tipo=1 = carro
 }
 
 function _foraHorario(v) {
@@ -320,17 +336,16 @@ function getIcon(v) {
   const dir    = v.direcao;
   const moving = v.ignicao === true && v.velocidade_atual > 0;
   const idling = v.ignicao === true && !(v.velocidade_atual > 0);
+  const make   = _isMoto(v) ? makeMotoIcon : makeCarIcon;
 
   if (_foraHorario(v)) {
-    // Laranja pulsante = fora do horário autorizado e em movimento
-    if (moving) return makeCarIcon('#f97316', dir, true);
-    if (idling) return makeCarIcon('#f97316', dir, false);
-    return makeCarIcon('#ef4444', dir, false);
+    if (moving) return make('#f97316', dir, true);
+    if (idling) return make('#f97316', dir, false);
+    return make('#ef4444', dir, false);
   }
-  if (moving) return makeCarIcon('#16a34a', dir, true);
-  if (idling) return makeCarIcon('#16a34a', dir, false);  // ligado parado = verde
-  if (v.ignicao === false) return makeCarIcon('#dc2626', dir, false);
-  return makeCarIcon('#d97706', dir, false);
+  if (moving) return make('#16a34a', dir, true);
+  if (idling) return make('#16a34a', dir, false);  // ligado parado = verde
+  return make('#94a3b8', dir, false);              // desligado / sem sinal = cinza
 }
 
 /* ── Cor da trilha por velocidade ── */
@@ -477,7 +492,7 @@ function renderizar() {
     const vel      = v.velocidade_atual != null ? Math.round(v.velocidade_atual) : 0;
     const velTxt   = vel + ' km/h';
     const fora     = _foraHorario(v);
-    const corDot   = fora ? 'red' : (v.ignicao === true ? 'green' : v.ignicao === false ? 'red' : 'gray');
+    const corDot   = fora ? 'red' : (v.ignicao === true ? 'green' : 'gray');
     const isFocado = veiculoFocado == v.id;
     const kmBadge  = fora && v.km_percorrido_hoje > 0
       ? `<span style="font-family:var(--mono);font-size:9px;color:#ef4444;font-weight:700;margin-left:4px">⚠ ${v.km_percorrido_hoje.toFixed(1)}km</span>` : '';

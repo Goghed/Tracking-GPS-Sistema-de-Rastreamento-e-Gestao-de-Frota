@@ -7,11 +7,14 @@ Auth: headers apiKey + secretKey em cada requisição (sem token/sessão).
 Roda a cada 1 minuto via APScheduler.
 """
 import logging
+import threading
 from datetime import datetime
 
 import requests
 from django.conf import settings
 from django.utils import timezone
+
+_sync_lock = threading.Lock()
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,17 @@ def sync_vehicles() -> int:
 # events/all retorna a ÚLTIMA POSIÇÃO de cada veículo
 
 def sync_positions() -> int:
+    # Se run_sync já está em andamento (tem o lock), espera até 5s ou desiste
+    if not _sync_lock.acquire(blocking=True, timeout=5):
+        logger.info("sync_positions: lock ocupado, ignorando chamada isolada")
+        return 0
+    try:
+        return _sync_positions_inner()
+    finally:
+        _sync_lock.release()
+
+
+def _sync_positions_inner() -> int:
     from core.models import Vehicle, PositionHistory
 
     data = _get('events/all')
@@ -245,12 +259,17 @@ def sync_alerts() -> int:
 
 def run_sync():
     """Job executado a cada 1 minuto pelo APScheduler."""
-    from core.models import SyncLog
+    # Se já há um sync em andamento, descarta esta chamada para evitar
+    # "database is locked" por escritas simultâneas no SQLite
+    if not _sync_lock.acquire(blocking=False):
+        logger.info("run_sync: já em andamento, ignorando chamada concorrente")
+        return
 
+    from core.models import SyncLog
     log = SyncLog.objects.create()
     try:
         v = sync_vehicles()
-        sync_positions()
+        _sync_positions_inner()  # run_sync já tem o lock, chama interno diretamente
         a = sync_alerts()
 
         log.veiculos_sync = v
@@ -263,3 +282,4 @@ def run_sync():
     finally:
         log.finalizado_em = timezone.now()
         log.save()
+        _sync_lock.release()
